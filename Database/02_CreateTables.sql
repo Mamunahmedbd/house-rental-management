@@ -140,6 +140,15 @@ CREATE UNIQUE INDEX UX_RentalAgreements_OneActiveRoom
 ON dbo.RentalAgreements(RoomId)
 WHERE Status = 'Active';
 
+CREATE INDEX IX_RentalAgreements_Status_EndDate
+ON dbo.RentalAgreements(Status, EndDate);
+
+CREATE INDEX IX_RentalAgreements_TenantId_Status
+ON dbo.RentalAgreements(TenantId, Status);
+
+CREATE INDEX IX_RentalAgreements_RoomId_Status
+ON dbo.RentalAgreements(RoomId, Status);
+
 CREATE TABLE dbo.RentPayments
 (
     PaymentId INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_RentPayments PRIMARY KEY,

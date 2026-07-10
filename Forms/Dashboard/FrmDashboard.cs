@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using Housing_rental.BLL;
 using Housing_rental.Forms.Admin;
+using Housing_rental.Forms.Agreements;
 using Housing_rental.Forms.Common;
 using Housing_rental.Forms.Properties;
 using Housing_rental.Forms.Tenants;
@@ -76,7 +77,7 @@ namespace Housing_rental.Forms.Dashboard
         private void BtnAgreements_Click(object sender, EventArgs e)
         {
             SetActiveButton(sender as Button);
-            ShowModule("Rental Agreement Management", "This module will create, renew, terminate, and track rental agreements between tenants and available rooms.");
+            NavigateToControl("Rental Agreements", new AgreementManagementControl());
         }
 
         private void BtnPayments_Click(object sender, EventArgs e)

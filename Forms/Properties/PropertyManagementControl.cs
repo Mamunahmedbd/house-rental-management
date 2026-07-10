@@ -967,7 +967,8 @@ namespace Housing_rental.Forms.Properties
         // Focus Highlight handlers
         private void Input_Enter(object sender, EventArgs e)
         {
-            if (sender is Control ctrl)
+            Control ctrl = sender as Control;
+            if (ctrl != null)
             {
                 ctrl.BackColor = Color.FromArgb(240, 249, 255); // Soft blue tint on focus
             }
@@ -975,7 +976,8 @@ namespace Housing_rental.Forms.Properties
 
         private void Input_Leave(object sender, EventArgs e)
         {
-            if (sender is Control ctrl)
+            Control ctrl = sender as Control;
+            if (ctrl != null)
             {
                 ctrl.BackColor = Color.White;
             }

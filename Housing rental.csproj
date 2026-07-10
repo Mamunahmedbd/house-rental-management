@@ -58,6 +58,7 @@
     <Compile Include="BLL\UserService.cs" />
     <Compile Include="ApplicationSessionContext.cs" />
     <Compile Include="DAL\AuditRepository.cs" />
+    <Compile Include="DAL\AgreementRepository.cs" />
     <Compile Include="DAL\DashboardRepository.cs" />
     <Compile Include="DAL\DbConnectionFactory.cs" />
     <Compile Include="DAL\PropertyRepository.cs" />
@@ -70,6 +71,12 @@
     </Compile>
     <Compile Include="Forms\Admin\UserManagementControl.Designer.cs">
       <DependentUpon>UserManagementControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\Agreements\AgreementManagementControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Forms\Agreements\AgreementManagementControl.Designer.cs">
+      <DependentUpon>AgreementManagementControl.cs</DependentUpon>
     </Compile>
     <Compile Include="Forms\Auth\FrmLogin.cs">
       <SubType>Form</SubType>
@@ -140,6 +147,7 @@
     <None Include="Database\03_CreateViews.sql" />
     <None Include="Database\04_CreateStoredProcedures.sql" />
     <None Include="Database\05_SeedData.sql" />
+    <None Include="docs\AGREEMENTS_MODULE_IMPLEMENTATION_PLAN.md" />
     <None Include="docs\HOUSE_RENTAL_MANAGEMENT_PROJECT_PLAN.md" />
     <None Include="docs\PROPERTIES_MODULE_IMPLEMENTATION_PLAN.md" />
     <None Include="docs\PROJECT_PLANNING_AND_ARCHITECTURE.md" />
