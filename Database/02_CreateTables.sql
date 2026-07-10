@@ -77,6 +77,18 @@ CREATE TABLE dbo.Rooms
     CONSTRAINT CK_Rooms_Status CHECK (Status IN ('Available', 'Occupied', 'Maintenance', 'Inactive'))
 );
 
+CREATE UNIQUE INDEX UX_Properties_PropertyName_City
+ON dbo.Properties(PropertyName, City)
+WHERE IsActive = 1;
+
+CREATE UNIQUE INDEX UX_Houses_PropertyId_HouseName
+ON dbo.Houses(PropertyId, HouseName)
+WHERE IsActive = 1;
+
+CREATE UNIQUE INDEX UX_Rooms_HouseId_RoomNo
+ON dbo.Rooms(HouseId, RoomNo)
+WHERE Status <> 'Inactive';
+
 CREATE TABLE dbo.Tenants
 (
     TenantId INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Tenants PRIMARY KEY,

@@ -4,6 +4,7 @@ using System.Windows.Forms;
 using Housing_rental.BLL;
 using Housing_rental.Forms.Admin;
 using Housing_rental.Forms.Common;
+using Housing_rental.Forms.Properties;
 using Housing_rental.Models;
 
 namespace Housing_rental.Forms.Dashboard
@@ -62,7 +63,7 @@ namespace Housing_rental.Forms.Dashboard
         private void BtnProperties_Click(object sender, EventArgs e)
         {
             SetActiveButton(sender as Button);
-            ShowModule("Property, House, and Room Management", "This module will manage the Property -> House -> Room hierarchy, room rent, availability, occupancy, and maintenance status.");
+            NavigateToControl("Properties", new PropertyManagementControl());
         }
 
         private void BtnTenants_Click(object sender, EventArgs e)
