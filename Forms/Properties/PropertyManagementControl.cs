@@ -48,6 +48,8 @@ namespace Housing_rental.Forms.Properties
             StartNewHouse();
             StartNewRoom();
             AdjustSplitContainers();
+
+            SetPlaceholder(txtSearch, "Search properties, houses or rooms...");
         }
 
         private void RefreshAll()
@@ -234,6 +236,7 @@ namespace Housing_rental.Forms.Properties
             txtPropertyDescription.Clear();
             chkPropertyActive.Checked = true;
             btnTogglePropertyActive.Enabled = false;
+            ResetButtonToSecondary(btnTogglePropertyActive);
             txtPropertyName.Focus();
         }
 
@@ -247,6 +250,7 @@ namespace Housing_rental.Forms.Properties
             txtHouseDescription.Clear();
             chkHouseActive.Checked = true;
             btnToggleHouseActive.Enabled = false;
+            ResetButtonToSecondary(btnToggleHouseActive);
 
             if (cmbHouseProperty.Items.Count > 0)
             {
@@ -267,6 +271,7 @@ namespace Housing_rental.Forms.Properties
             btnSetAvailable.Enabled = false;
             btnSetMaintenance.Enabled = false;
             btnSetInactive.Enabled = false;
+            HighlightRoomStatusButtons(null);
 
             if (cmbRoomProperty.Items.Count > 0)
             {
@@ -292,6 +297,7 @@ namespace Housing_rental.Forms.Properties
             chkPropertyActive.Checked = property.IsActive;
             btnTogglePropertyActive.Enabled = true;
             btnTogglePropertyActive.Text = property.IsActive ? "Deactivate" : "Activate";
+            UpdateButtonActiveStateColor(btnTogglePropertyActive, property.IsActive);
         }
 
         private void LoadSelectedHouse(House house)
@@ -311,6 +317,7 @@ namespace Housing_rental.Forms.Properties
             chkHouseActive.Checked = house.IsActive;
             btnToggleHouseActive.Enabled = true;
             btnToggleHouseActive.Text = house.IsActive ? "Deactivate" : "Activate";
+            UpdateButtonActiveStateColor(btnToggleHouseActive, house.IsActive);
         }
 
         private void LoadSelectedRoom(Room room)
@@ -339,6 +346,7 @@ namespace Housing_rental.Forms.Properties
             btnSetAvailable.Enabled = true;
             btnSetMaintenance.Enabled = true;
             btnSetInactive.Enabled = true;
+            HighlightRoomStatusButtons(room.Status);
         }
 
         private Property ReadPropertyFromForm()
@@ -939,6 +947,138 @@ namespace Housing_rental.Forms.Properties
         private void DgvRooms_SelectionChanged(object sender, EventArgs e)
         {
             LoadSelectedRoom(_roomBindingSource.Current as Room);
+        }
+
+        // Cue banner placeholder support
+        [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+        private static extern Int32 SendMessage(IntPtr hWnd, int msg, int wParam, [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.LPWStr)] string lParam);
+
+        private const int EM_SETCUEBANNER = 0x1501;
+
+        private void SetPlaceholder(TextBox textBox, string placeholder)
+        {
+            if (textBox != null)
+            {
+                IntPtr handle = textBox.Handle;
+                SendMessage(handle, EM_SETCUEBANNER, 0, placeholder);
+            }
+        }
+
+        // Focus Highlight handlers
+        private void Input_Enter(object sender, EventArgs e)
+        {
+            if (sender is Control ctrl)
+            {
+                ctrl.BackColor = Color.FromArgb(240, 249, 255); // Soft blue tint on focus
+            }
+        }
+
+        private void Input_Leave(object sender, EventArgs e)
+        {
+            if (sender is Control ctrl)
+            {
+                ctrl.BackColor = Color.White;
+            }
+        }
+
+        // Owner-draw TabControl custom rendering
+        private void TabMain_DrawItem(object sender, DrawItemEventArgs e)
+        {
+            TabControl tc = (TabControl)sender;
+            if (tc.TabPages.Count == 0 || e.Index < 0 || e.Index >= tc.TabPages.Count) return;
+
+            TabPage page = tc.TabPages[e.Index];
+            bool selected = tc.SelectedIndex == e.Index;
+
+            // Colors
+            Color backColor = selected ? Color.White : Color.FromArgb(241, 245, 249);
+            Color textColor = selected ? Color.FromArgb(37, 99, 235) : Color.FromArgb(100, 116, 139);
+            Font textFont = new Font("Segoe UI", 9.5F, selected ? FontStyle.Bold : FontStyle.Regular);
+
+            // Fill tab button background
+            using (SolidBrush brush = new SolidBrush(backColor))
+            {
+                e.Graphics.FillRectangle(brush, e.Bounds);
+            }
+
+            // Draw Centered text
+            TextRenderer.DrawText(e.Graphics, page.Text, textFont, e.Bounds, textColor,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+
+            // Draw accent active indicator line at the bottom
+            if (selected)
+            {
+                using (Pen pen = new Pen(Color.FromArgb(37, 99, 235), 3))
+                {
+                    e.Graphics.DrawLine(pen, e.Bounds.Left, e.Bounds.Bottom - 2, e.Bounds.Right, e.Bounds.Bottom - 2);
+                }
+            }
+            else
+            {
+                // Draw a subtle border bottom line
+                using (Pen pen = new Pen(Color.FromArgb(226, 232, 240), 1))
+                {
+                    e.Graphics.DrawLine(pen, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
+                }
+            }
+        }
+
+        // Room Status button highlighting
+        private void HighlightRoomStatusButtons(string currentStatus)
+        {
+            ResetButtonToSecondary(btnSetAvailable);
+            ResetButtonToSecondary(btnSetMaintenance);
+            ResetButtonToSecondary(btnSetInactive);
+
+            if (string.Equals(currentStatus, "Available", StringComparison.OrdinalIgnoreCase))
+            {
+                HighlightButton(btnSetAvailable, Color.FromArgb(22, 163, 74)); // Success green
+            }
+            else if (string.Equals(currentStatus, "Maintenance", StringComparison.OrdinalIgnoreCase))
+            {
+                HighlightButton(btnSetMaintenance, Color.FromArgb(217, 119, 6)); // Amber orange
+            }
+            else if (string.Equals(currentStatus, "Inactive", StringComparison.OrdinalIgnoreCase))
+            {
+                HighlightButton(btnSetInactive, Color.FromArgb(220, 38, 38)); // Red
+            }
+        }
+
+        private void ResetButtonToSecondary(Button btn)
+        {
+            if (btn == null) return;
+            btn.BackColor = Color.FromArgb(241, 245, 249);
+            btn.ForeColor = Color.FromArgb(51, 65, 85);
+            btn.FlatAppearance.BorderColor = Color.FromArgb(226, 232, 240);
+            btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(226, 232, 240);
+            btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(203, 213, 225);
+        }
+
+        private void HighlightButton(Button btn, Color color)
+        {
+            if (btn == null) return;
+            btn.BackColor = color;
+            btn.ForeColor = Color.White;
+            btn.FlatAppearance.BorderColor = color;
+            btn.FlatAppearance.MouseOverBackColor = color;
+            btn.FlatAppearance.MouseDownBackColor = color;
+        }
+
+        private void UpdateButtonActiveStateColor(Button btn, bool isActive)
+        {
+            if (btn == null) return;
+            if (isActive)
+            {
+                btn.ForeColor = Color.FromArgb(220, 38, 38); // Warning red for deactivation
+                btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(254, 242, 242);
+                btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(254, 226, 226);
+            }
+            else
+            {
+                btn.ForeColor = Color.FromArgb(22, 163, 74); // Success green for activation
+                btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(240, 253, 250);
+                btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(204, 251, 241);
+            }
         }
     }
 }

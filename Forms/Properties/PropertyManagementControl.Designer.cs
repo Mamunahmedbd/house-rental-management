@@ -6,6 +6,7 @@ namespace Housing_rental.Forms.Properties
 {
     public partial class PropertyManagementControl
     {
+        private Panel filterPanel;
         private TableLayoutPanel pageLayout;
         private TableLayoutPanel filterLayout;
         private TextBox txtSearch;
@@ -71,7 +72,7 @@ namespace Housing_rental.Forms.Properties
                 Padding = new Padding(24, 20, 24, 16),
                 BackColor = Color.FromArgb(248, 250, 252)
             };
-            pageLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 54F));
+            pageLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 60F));
             pageLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             pageLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28F));
 
@@ -88,7 +89,7 @@ namespace Housing_rental.Forms.Properties
                 TextAlign = ContentAlignment.MiddleLeft
             };
 
-            pageLayout.Controls.Add(filterLayout, 0, 0);
+            pageLayout.Controls.Add(filterPanel, 0, 0);
             pageLayout.Controls.Add(tabMain, 0, 1);
             pageLayout.Controls.Add(lblStatus, 0, 2);
             Controls.Add(pageLayout);
@@ -96,12 +97,21 @@ namespace Housing_rental.Forms.Properties
 
         private void BuildFilters()
         {
+            filterPanel = new Panel
+            {
+                BackColor = Color.White,
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 0, 0, 12),
+                Padding = new Padding(16, 2, 16, 2)
+            };
+            filterPanel.Paint += SurfacePanel_Paint;
+
             filterLayout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 6,
                 RowCount = 1,
-                BackColor = Color.FromArgb(248, 250, 252)
+                BackColor = Color.White
             };
             filterLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             filterLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170F));
@@ -111,18 +121,22 @@ namespace Housing_rental.Forms.Properties
             filterLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96F));
 
             txtSearch = CreateInput();
+            txtSearch.Dock = DockStyle.Fill;
             txtSearch.Margin = new Padding(0, 8, 10, 8);
             txtSearch.TextChanged += TxtSearch_TextChanged;
 
             cmbFilterProperty = CreateCombo();
+            cmbFilterProperty.Dock = DockStyle.Fill;
             cmbFilterProperty.Margin = new Padding(0, 8, 10, 8);
             cmbFilterProperty.SelectedIndexChanged += CmbFilterProperty_SelectedIndexChanged;
 
             cmbFilterHouse = CreateCombo();
+            cmbFilterHouse.Dock = DockStyle.Fill;
             cmbFilterHouse.Margin = new Padding(0, 8, 10, 8);
             cmbFilterHouse.SelectedIndexChanged += CmbFilterHouse_SelectedIndexChanged;
 
             cmbFilterStatus = CreateCombo();
+            cmbFilterStatus.Dock = DockStyle.Fill;
             cmbFilterStatus.Margin = new Padding(0, 8, 10, 8);
             cmbFilterStatus.Items.AddRange(new object[] { "All statuses", "Available", "Occupied", "Maintenance", "Inactive" });
             cmbFilterStatus.SelectedIndex = 0;
@@ -150,6 +164,8 @@ namespace Housing_rental.Forms.Properties
             filterLayout.Controls.Add(cmbFilterStatus, 3, 0);
             filterLayout.Controls.Add(chkIncludeInactive, 4, 0);
             filterLayout.Controls.Add(btnRefresh, 5, 0);
+
+            filterPanel.Controls.Add(filterLayout);
         }
 
         private void BuildTabs()
@@ -157,9 +173,13 @@ namespace Housing_rental.Forms.Properties
             tabMain = new TabControl
             {
                 Dock = DockStyle.Fill,
-                Font = new Font("Segoe UI", 9.5F)
+                Font = new Font("Segoe UI", 9.5F),
+                DrawMode = TabDrawMode.OwnerDrawFixed,
+                ItemSize = new Size(140, 42),
+                SizeMode = TabSizeMode.Fixed
             };
             tabMain.SelectedIndexChanged += TabMain_SelectedIndexChanged;
+            tabMain.DrawItem += TabMain_DrawItem;
 
             tabProperties = new TabPage("Properties") { BackColor = Color.FromArgb(248, 250, 252) };
             tabHouses = new TabPage("Houses / Units") { BackColor = Color.FromArgb(248, 250, 252) };
@@ -209,7 +229,11 @@ namespace Housing_rental.Forms.Properties
             editor.Controls.Add(CreateActionRow(btnNewProperty, btnSaveProperty, btnTogglePropertyActive), 0, editor.Controls.Count);
 
             editorPanel.Controls.Add(editor);
-            split.Panel1.Controls.Add(dgvProperties);
+            
+            Panel gridPanel = CreateSurfacePanel();
+            gridPanel.Controls.Add(dgvProperties);
+            split.Panel1.Controls.Add(gridPanel);
+            
             split.Panel2.Controls.Add(editorPanel);
             tabProperties.Controls.Add(split);
         }
@@ -246,7 +270,11 @@ namespace Housing_rental.Forms.Properties
             editor.Controls.Add(CreateActionRow(btnNewHouse, btnSaveHouse, btnToggleHouseActive), 0, editor.Controls.Count);
 
             editorPanel.Controls.Add(editor);
-            split.Panel1.Controls.Add(dgvHouses);
+            
+            Panel gridPanel = CreateSurfacePanel();
+            gridPanel.Controls.Add(dgvHouses);
+            split.Panel1.Controls.Add(gridPanel);
+            
             split.Panel2.Controls.Add(editorPanel);
             tabHouses.Controls.Add(split);
         }
@@ -278,6 +306,8 @@ namespace Housing_rental.Forms.Properties
                 ThousandsSeparator = true,
                 Width = EditorWidth
             };
+            nudMonthlyRent.Enter += Input_Enter;
+            nudMonthlyRent.Leave += Input_Leave;
             cmbRoomStatus = CreateCombo();
             cmbRoomStatus.Items.AddRange(new object[] { "Available", "Occupied", "Maintenance", "Inactive" });
             txtRoomDescription = CreateMultilineInput();
@@ -305,7 +335,11 @@ namespace Housing_rental.Forms.Properties
             editor.Controls.Add(CreateStatusActionRow(), 0, editor.Controls.Count);
 
             editorPanel.Controls.Add(editor);
-            split.Panel1.Controls.Add(dgvRooms);
+            
+            Panel gridPanel = CreateSurfacePanel();
+            gridPanel.Controls.Add(dgvRooms);
+            split.Panel1.Controls.Add(gridPanel);
+            
             split.Panel2.Controls.Add(editorPanel);
             tabRooms.Controls.Add(split);
         }
@@ -455,7 +489,7 @@ namespace Housing_rental.Forms.Properties
 
         private TextBox CreateInput()
         {
-            return new TextBox
+            TextBox input = new TextBox
             {
                 Anchor = AnchorStyles.Top | AnchorStyles.Left,
                 BorderStyle = BorderStyle.FixedSingle,
@@ -463,6 +497,9 @@ namespace Housing_rental.Forms.Properties
                 Margin = new Padding(0, 0, 0, 12),
                 Width = EditorWidth
             };
+            input.Enter += Input_Enter;
+            input.Leave += Input_Leave;
+            return input;
         }
 
         private TextBox CreateMultilineInput()
@@ -476,7 +513,7 @@ namespace Housing_rental.Forms.Properties
 
         private ComboBox CreateCombo()
         {
-            return new ComboBox
+            ComboBox combo = new ComboBox
             {
                 Anchor = AnchorStyles.Top | AnchorStyles.Left,
                 DropDownStyle = ComboBoxStyle.DropDownList,
@@ -485,6 +522,9 @@ namespace Housing_rental.Forms.Properties
                 Margin = new Padding(0, 0, 0, 12),
                 Width = EditorWidth
             };
+            combo.Enter += Input_Enter;
+            combo.Leave += Input_Leave;
+            return combo;
         }
 
         private CheckBox CreateCheckBox(string text)
