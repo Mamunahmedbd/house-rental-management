@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Housing_rental.BLL;
 using Housing_rental.Models;
@@ -14,6 +15,12 @@ namespace Housing_rental.Forms.Admin
         private List<Role> _roles;
         private int _selectedUserId;
 
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, int wParam, int lParam);
+
+        private const int EM_SETMARGINS = 0xd3;
+        private const int EC_RIGHTMARGIN = 2;
+
         public UserManagementControl()
         {
             _userService = new UserService();
@@ -21,6 +28,9 @@ namespace Housing_rental.Forms.Admin
             _roles = new List<Role>();
 
             InitializeComponent();
+
+            btnTogglePassword.Paint += BtnTogglePassword_Paint;
+            btnToggleConfirmPassword.Paint += BtnTogglePassword_Paint;
         }
 
         protected override void OnLoad(EventArgs e)
@@ -30,6 +40,22 @@ namespace Housing_rental.Forms.Admin
             LoadUsers();
             StartNewUser();
             AdjustSplitter();
+            SetPasswordTextBoxMargins();
+        }
+
+        private void SetPasswordTextBoxMargins()
+        {
+            try
+            {
+                // Set right margin of password textboxes to leave space for the inline toggle buttons
+                int marginWidth = btnTogglePassword.Width + 8; // 24 + 8 = 32 pixels
+                SendMessage(txtPassword.Handle, EM_SETMARGINS, EC_RIGHTMARGIN, marginWidth << 16);
+                SendMessage(txtConfirmPassword.Handle, EM_SETMARGINS, EC_RIGHTMARGIN, marginWidth << 16);
+            }
+            catch (Exception)
+            {
+                // Fallback in case handle is not created or API call fails
+            }
         }
 
         private void LoadRoles()
@@ -296,18 +322,98 @@ namespace Housing_rental.Forms.Admin
         {
             txtPassword.PasswordChar = visible ? '\0' : '*';
             txtConfirmPassword.PasswordChar = visible ? '\0' : '*';
-            btnTogglePassword.Text = visible ? "\u25D0" : "\u25C9";
-            btnToggleConfirmPassword.Text = visible ? "\u25D0" : "\u25C9";
             passwordToolTip.SetToolTip(btnTogglePassword, visible ? "Hide password" : "Show password");
             passwordToolTip.SetToolTip(btnToggleConfirmPassword, visible ? "Hide confirm password" : "Show confirm password");
+            btnTogglePassword.Invalidate();
+            btnToggleConfirmPassword.Invalidate();
         }
 
         private void TogglePasswordVisibility(TextBox textBox, Button button)
         {
             bool willShow = textBox.PasswordChar != '\0';
             textBox.PasswordChar = willShow ? '\0' : '*';
-            button.Text = willShow ? "\u25D0" : "\u25C9";
             passwordToolTip.SetToolTip(button, willShow ? "Hide password" : "Show password");
+            button.Invalidate();
+        }
+
+        private void BtnTogglePassword_Paint(object sender, PaintEventArgs e)
+        {
+            Button button = sender as Button;
+            if (button == null) return;
+
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            int w = button.Width;
+            int h = button.Height;
+
+            // We draw on a 24x24 virtual grid, scaled to fit the button
+            float scale = Math.Min(w, h) / 24f;
+            e.Graphics.ScaleTransform(scale, scale);
+
+            // Shift to center the drawing inside the button
+            float offsetX = (w / scale - 24f) / 2f;
+            float offsetY = (h / scale - 24f) / 2f;
+            e.Graphics.TranslateTransform(offsetX, offsetY);
+
+            // Determine if the associated textbox is masked
+            TextBox assocTextBox = (button == btnTogglePassword) ? txtPassword : txtConfirmPassword;
+            bool isMasked = assocTextBox.PasswordChar != '\0';
+
+            // Sleek slate-500 color (#64748B)
+            Color iconColor = Color.FromArgb(100, 116, 139);
+            using (Pen pen = new Pen(iconColor, 1.8f))
+            {
+                pen.StartCap = System.Drawing.Drawing2D.LineCap.Round;
+                pen.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+                pen.LineJoin = System.Drawing.Drawing2D.LineJoin.Round;
+
+                if (isMasked)
+                {
+                    // Eye-off state (hidden password) - Lucide eye-off design
+                    // 1. Diagonal slash line from (3, 3) to (21, 21)
+                    e.Graphics.DrawLine(pen, 3f, 3f, 21f, 21f);
+
+                    // 2. Eyelids
+                    e.Graphics.DrawBezier(pen, 
+                        new PointF(2, 12), 
+                        new PointF(6, 5), 
+                        new PointF(18, 5), 
+                        new PointF(22, 12));
+                    
+                    e.Graphics.DrawBezier(pen, 
+                        new PointF(2, 12), 
+                        new PointF(6, 19), 
+                        new PointF(18, 19), 
+                        new PointF(22, 12));
+
+                    // 3. Iris outline
+                    e.Graphics.DrawEllipse(pen, 9f, 9f, 6f, 6f);
+                }
+                else
+                {
+                    // Eye state (visible password) - Lucide eye design
+                    // 1. Eyelids
+                    e.Graphics.DrawBezier(pen, 
+                        new PointF(2, 12), 
+                        new PointF(6, 5), 
+                        new PointF(18, 5), 
+                        new PointF(22, 12));
+                    
+                    e.Graphics.DrawBezier(pen, 
+                        new PointF(2, 12), 
+                        new PointF(6, 19), 
+                        new PointF(18, 19), 
+                        new PointF(22, 12));
+
+                    // 2. Iris outline
+                    e.Graphics.DrawEllipse(pen, 9f, 9f, 6f, 6f);
+
+                    // 3. Pupil filled dot
+                    using (SolidBrush brush = new SolidBrush(iconColor))
+                    {
+                        e.Graphics.FillEllipse(brush, 11f, 11f, 2f, 2f);
+                    }
+                }
+            }
         }
 
         private void SetStatus(string message, bool isError)

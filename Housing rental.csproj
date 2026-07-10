@@ -129,6 +129,9 @@
     <None Include="docs\HOUSE_RENTAL_MANAGEMENT_PROJECT_PLAN.md" />
     <None Include="docs\PROJECT_PLANNING_AND_ARCHITECTURE.md" />
     <None Include="README.md" />
+    <Content Include="Assets\login_bg.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

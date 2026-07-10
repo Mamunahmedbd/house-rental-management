@@ -283,15 +283,17 @@ namespace Housing_rental.Forms.Admin
             txtPassword.PasswordChar = '*';
             txtConfirmPassword = CreateInput();
             txtConfirmPassword.PasswordChar = '*';
-            btnTogglePassword = CreatePasswordToggleButton();
-            btnToggleConfirmPassword = CreatePasswordToggleButton();
+            btnTogglePassword = CreatePasswordToggleButton(txtPassword);
+            btnToggleConfirmPassword = CreatePasswordToggleButton(txtConfirmPassword);
+            txtPassword.Controls.Add(btnTogglePassword);
+            txtConfirmPassword.Controls.Add(btnToggleConfirmPassword);
             btnTogglePassword.Click += BtnTogglePassword_Click;
             btnToggleConfirmPassword.Click += BtnToggleConfirmPassword_Click;
 
             passwordSection.Controls.Add(CreateFieldLabel("Password"), 0, 0);
-            passwordSection.Controls.Add(CreatePasswordInputPanel(txtPassword, btnTogglePassword), 0, 1);
+            passwordSection.Controls.Add(txtPassword, 0, 1);
             passwordSection.Controls.Add(CreateFieldLabel("Confirm Password"), 0, 2);
-            passwordSection.Controls.Add(CreatePasswordInputPanel(txtConfirmPassword, btnToggleConfirmPassword), 0, 3);
+            passwordSection.Controls.Add(txtConfirmPassword, 0, 3);
 
             lblPasswordHelp = new Label
             {
@@ -452,46 +454,20 @@ namespace Housing_rental.Forms.Admin
             };
         }
 
-        private TableLayoutPanel CreatePasswordInputPanel(TextBox textBox, Button toggleButton)
-        {
-            TableLayoutPanel panel = new TableLayoutPanel
-            {
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                ColumnCount = 2,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left,
-                Margin = new Padding(0, 0, 0, 12),
-                RowCount = 1,
-                Width = EditorFieldWidth
-            };
-            panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48F));
-
-            textBox.Margin = new Padding(0);
-            textBox.Dock = DockStyle.Fill;
-            toggleButton.Margin = new Padding(8, 0, 0, 0);
-            toggleButton.Dock = DockStyle.Fill;
-            toggleButton.Height = textBox.Height;
-
-            panel.Controls.Add(textBox, 0, 0);
-            panel.Controls.Add(toggleButton, 1, 0);
-            return panel;
-        }
-
-        private Button CreatePasswordToggleButton()
+        private Button CreatePasswordToggleButton(TextBox parentTextBox)
         {
             Button button = new Button
             {
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI Symbol", 9.5F, FontStyle.Bold),
-                UseVisualStyleBackColor = false
+                UseVisualStyleBackColor = false,
+                Size = new Size(24, 18),
+                Location = new Point(parentTextBox.Width - 28, 2),
+                BackColor = Color.White,
+                Cursor = Cursors.Hand
             };
-            button.FlatAppearance.BorderSize = 1;
-            button.BackColor = Color.FromArgb(241, 245, 249);
-            button.ForeColor = Color.FromArgb(71, 85, 105);
-            button.FlatAppearance.BorderColor = Color.FromArgb(226, 232, 240);
-            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(203, 213, 225);
-            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(226, 232, 240);
+            button.FlatAppearance.BorderSize = 0;
+            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(226, 232, 240);
+            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(241, 245, 249);
             passwordToolTip.SetToolTip(button, "Show password");
             return button;
         }
