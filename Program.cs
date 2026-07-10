@@ -1,6 +1,5 @@
 using System;
 using System.Windows.Forms;
-using Housing_rental.Forms.Auth;
 
 namespace Housing_rental
 {
@@ -14,7 +13,7 @@ namespace Housing_rental
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new FrmLogin());
+            Application.Run(new ApplicationSessionContext());
         }
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using Housing_rental.DAL;
 using Housing_rental.Models;
 
@@ -220,6 +221,11 @@ namespace Housing_rental.BLL
                 return ServiceResult.Failure("Username must be at least 3 characters.");
             }
 
+            if (!IsValidOptionalEmail(user.Email))
+            {
+                return ServiceResult.Failure("Please enter a valid email address.");
+            }
+
             if (requirePassword)
             {
                 return ValidatePassword(password, confirmPassword);
@@ -251,6 +257,19 @@ namespace Housing_rental.BLL
         private string CleanOptional(string value)
         {
             return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        }
+
+        private bool IsValidOptionalEmail(string email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return true;
+            }
+
+            return Regex.IsMatch(
+                email.Trim(),
+                @"^[^@\s]+@[^@\s]+\.[^@\s]+$",
+                RegexOptions.IgnoreCase);
         }
 
         private void TryAudit(string actionName, string tableName, string recordId, string description)

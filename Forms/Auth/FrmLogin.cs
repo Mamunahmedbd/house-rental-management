@@ -1,7 +1,6 @@
 using System;
 using System.Windows.Forms;
 using Housing_rental.BLL;
-using Housing_rental.Forms.Dashboard;
 using Housing_rental.Models;
 
 namespace Housing_rental.Forms.Auth
@@ -9,6 +8,8 @@ namespace Housing_rental.Forms.Auth
     public partial class FrmLogin : Form
     {
         private readonly AuthService _authService;
+
+        public event EventHandler LoginSucceeded;
 
         public FrmLogin()
         {
@@ -26,22 +27,22 @@ namespace Housing_rental.Forms.Auth
                 return;
             }
 
-            Hide();
-
-            using (FrmDashboard dashboard = new FrmDashboard())
-            {
-                dashboard.ShowDialog();
-            }
-
-            CurrentSession.End();
-            txtPassword.Clear();
-            Show();
-            txtUsername.Focus();
+            OnLoginSucceeded();
         }
 
         private void BtnExit_Click(object sender, EventArgs e)
         {
             Close();
+        }
+
+        private void OnLoginSucceeded()
+        {
+            EventHandler handler = LoginSucceeded;
+
+            if (handler != null)
+            {
+                handler(this, EventArgs.Empty);
+            }
         }
     }
 }

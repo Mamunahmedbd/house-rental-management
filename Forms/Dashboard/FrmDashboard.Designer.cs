@@ -4,6 +4,7 @@ namespace Housing_rental.Forms.Dashboard
     {
         private System.ComponentModel.IContainer components = null;
         private System.Windows.Forms.Panel pnlSidebar;
+        private System.Windows.Forms.Label lblLogo;
         private System.Windows.Forms.Panel pnlHeader;
         private System.Windows.Forms.Panel pnlContent;
         private System.Windows.Forms.TableLayoutPanel dashboardGrid;
@@ -42,6 +43,7 @@ namespace Housing_rental.Forms.Dashboard
         private void InitializeComponent()
         {
             this.pnlSidebar = new System.Windows.Forms.Panel();
+            this.lblLogo = new System.Windows.Forms.Label();
             this.btnSettings = new System.Windows.Forms.Button();
             this.btnUsers = new System.Windows.Forms.Button();
             this.btnReports = new System.Windows.Forms.Button();
@@ -72,9 +74,21 @@ namespace Housing_rental.Forms.Dashboard
             this.dashboardGrid.SuspendLayout();
             this.SuspendLayout();
             // 
+            // lblLogo
+            // 
+            this.lblLogo.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold);
+            this.lblLogo.ForeColor = System.Drawing.Color.White;
+            this.lblLogo.Location = new System.Drawing.Point(10, 15);
+            this.lblLogo.Name = "lblLogo";
+            this.lblLogo.Size = new System.Drawing.Size(170, 30);
+            this.lblLogo.TabIndex = 8;
+            this.lblLogo.Text = "🏠 Rental Admin";
+            this.lblLogo.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            // 
             // pnlSidebar
             // 
-            this.pnlSidebar.BackColor = System.Drawing.Color.FromArgb(37, 52, 73);
+            this.pnlSidebar.BackColor = System.Drawing.Color.FromArgb(30, 41, 59);
+            this.pnlSidebar.Controls.Add(this.lblLogo);
             this.pnlSidebar.Controls.Add(this.btnSettings);
             this.pnlSidebar.Controls.Add(this.btnUsers);
             this.pnlSidebar.Controls.Add(this.btnReports);
@@ -251,18 +265,23 @@ namespace Housing_rental.Forms.Dashboard
 
         private void ConfigureSidebarButton(System.Windows.Forms.Button button, string text, int top, bool selected)
         {
-            button.BackColor = selected ? System.Drawing.Color.FromArgb(31, 90, 160) : System.Drawing.Color.FromArgb(37, 52, 73);
+            button.BackColor = System.Drawing.Color.Transparent;
             button.FlatAppearance.BorderSize = 0;
+            button.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(51, 65, 85);
+            button.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(15, 23, 42);
             button.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            button.Font = selected
-                ? new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold)
-                : new System.Drawing.Font("Segoe UI", 10F);
-            button.ForeColor = System.Drawing.Color.White;
+            button.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Regular);
+            button.ForeColor = System.Drawing.Color.FromArgb(148, 163, 184);
             button.Location = new System.Drawing.Point(0, top);
             button.Name = "btn" + text.Replace(" ", string.Empty);
             button.Size = new System.Drawing.Size(190, 48);
-            button.Text = text;
+            button.Text = "   " + text;
+            button.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            button.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            button.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
+            button.Padding = new System.Windows.Forms.Padding(15, 0, 0, 0);
             button.UseVisualStyleBackColor = false;
+            button.Paint += new System.Windows.Forms.PaintEventHandler(this.SidebarButton_Paint);
         }
 
         private void ConfigureSummaryLabel(System.Windows.Forms.Label label, string text)

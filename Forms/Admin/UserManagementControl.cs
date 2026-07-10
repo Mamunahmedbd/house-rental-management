@@ -7,30 +7,12 @@ using Housing_rental.Models;
 
 namespace Housing_rental.Forms.Admin
 {
-    public class UserManagementControl : UserControl
+    public partial class UserManagementControl : UserControl
     {
         private readonly UserService _userService;
         private readonly BindingSource _userBindingSource;
         private List<Role> _roles;
         private int _selectedUserId;
-
-        private DataGridView dgvUsers;
-        private TextBox txtSearch;
-        private TextBox txtFullName;
-        private TextBox txtUsername;
-        private TextBox txtPhone;
-        private TextBox txtEmail;
-        private TextBox txtPassword;
-        private TextBox txtConfirmPassword;
-        private ComboBox cmbRole;
-        private CheckBox chkIsActive;
-        private Button btnNew;
-        private Button btnSave;
-        private Button btnResetPassword;
-        private Button btnToggleActive;
-        private Button btnRefresh;
-        private Label lblStatus;
-        private Label lblMode;
 
         public UserManagementControl()
         {
@@ -47,211 +29,7 @@ namespace Housing_rental.Forms.Admin
             LoadRoles();
             LoadUsers();
             StartNewUser();
-        }
-
-        private void InitializeComponent()
-        {
-            Dock = DockStyle.Fill;
-            MinimumSize = new Size(900, 560);
-            BackColor = Color.FromArgb(245, 247, 250);
-            Font = new Font("Segoe UI", 9F);
-
-            Panel header = new Panel
-            {
-                BackColor = Color.White,
-                Dock = DockStyle.Top,
-                Height = 82
-            };
-
-            Label title = new Label
-            {
-                AutoSize = true,
-                Font = new Font("Segoe UI", 18F, FontStyle.Bold),
-                Location = new Point(24, 16),
-                Text = "User Management"
-            };
-
-            Label subtitle = new Label
-            {
-                AutoSize = true,
-                ForeColor = Color.DimGray,
-                Location = new Point(28, 53),
-                Text = "Manage Admin and Staff accounts, roles, active status, and password resets."
-            };
-
-            header.Controls.Add(title);
-            header.Controls.Add(subtitle);
-
-            Panel leftPanel = new Panel
-            {
-                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left,
-                BackColor = Color.White,
-                Location = new Point(24, 106),
-                Size = new Size(650, 500)
-            };
-
-            Label searchLabel = new Label
-            {
-                AutoSize = true,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                Location = new Point(18, 18),
-                Text = "Search Users"
-            };
-
-            txtSearch = new TextBox
-            {
-                Location = new Point(20, 44),
-                Size = new Size(390, 27)
-            };
-            txtSearch.TextChanged += TxtSearch_TextChanged;
-
-            btnRefresh = CreateButton("Refresh", 420, 42, 92, 31);
-            btnRefresh.Click += BtnRefresh_Click;
-
-            btnNew = CreateButton("New User", 522, 42, 108, 31);
-            btnNew.BackColor = Color.FromArgb(31, 90, 160);
-            btnNew.ForeColor = Color.White;
-            btnNew.FlatStyle = FlatStyle.Flat;
-            btnNew.Click += BtnNew_Click;
-
-            dgvUsers = new DataGridView
-            {
-                AllowUserToAddRows = false,
-                AllowUserToDeleteRows = false,
-                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
-                AutoGenerateColumns = false,
-                BackgroundColor = Color.White,
-                BorderStyle = BorderStyle.None,
-                DataSource = _userBindingSource,
-                Location = new Point(20, 88),
-                MultiSelect = false,
-                ReadOnly = true,
-                RowHeadersVisible = false,
-                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-                Size = new Size(610, 388)
-            };
-            dgvUsers.SelectionChanged += DgvUsers_SelectionChanged;
-
-            AddGridColumn("FullName", "Full Name", 160);
-            AddGridColumn("Username", "Username", 100);
-            AddGridColumn("RoleName", "Role", 80);
-            AddGridColumn("Phone", "Phone", 105);
-            AddGridColumn("IsActive", "Active", 60);
-            AddGridColumn("LastLoginAt", "Last Login", 120);
-
-            leftPanel.Controls.Add(searchLabel);
-            leftPanel.Controls.Add(txtSearch);
-            leftPanel.Controls.Add(btnRefresh);
-            leftPanel.Controls.Add(btnNew);
-            leftPanel.Controls.Add(dgvUsers);
-
-            Panel editorPanel = new Panel
-            {
-                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
-                BackColor = Color.White,
-                Location = new Point(696, 106),
-                Size = new Size(376, 500)
-            };
-
-            lblMode = new Label
-            {
-                AutoSize = true,
-                Font = new Font("Segoe UI", 13F, FontStyle.Bold),
-                Location = new Point(22, 18),
-                Text = "New User"
-            };
-
-            int labelX = 24;
-            int inputX = 24;
-            int top = 62;
-            int inputWidth = 326;
-
-            Label lblFullName = CreateLabel("Full Name", labelX, top);
-            txtFullName = CreateTextBox(inputX, top + 22, inputWidth);
-
-            top += 58;
-            Label lblUsername = CreateLabel("Username", labelX, top);
-            txtUsername = CreateTextBox(inputX, top + 22, inputWidth);
-
-            top += 58;
-            Label lblRole = CreateLabel("Role", labelX, top);
-            cmbRole = new ComboBox
-            {
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Location = new Point(inputX, top + 22),
-                Size = new Size(inputWidth, 27)
-            };
-
-            top += 58;
-            Label lblPhone = CreateLabel("Phone", labelX, top);
-            txtPhone = CreateTextBox(inputX, top + 22, inputWidth);
-
-            top += 58;
-            Label lblEmail = CreateLabel("Email", labelX, top);
-            txtEmail = CreateTextBox(inputX, top + 22, inputWidth);
-
-            top += 58;
-            chkIsActive = new CheckBox
-            {
-                AutoSize = true,
-                Checked = true,
-                Location = new Point(inputX, top + 4),
-                Text = "Active user account"
-            };
-
-            top += 36;
-            Label lblPassword = CreateLabel("Password / New Password", labelX, top);
-            txtPassword = CreatePasswordBox(inputX, top + 22, inputWidth);
-
-            top += 58;
-            Label lblConfirmPassword = CreateLabel("Confirm Password", labelX, top);
-            txtConfirmPassword = CreatePasswordBox(inputX, top + 22, inputWidth);
-
-            btnSave = CreateButton("Save User", 24, 434, 104, 36);
-            btnSave.BackColor = Color.FromArgb(31, 90, 160);
-            btnSave.ForeColor = Color.White;
-            btnSave.FlatStyle = FlatStyle.Flat;
-            btnSave.Click += BtnSave_Click;
-
-            btnResetPassword = CreateButton("Reset Password", 136, 434, 124, 36);
-            btnResetPassword.Click += BtnResetPassword_Click;
-
-            btnToggleActive = CreateButton("Deactivate", 268, 434, 92, 36);
-            btnToggleActive.Click += BtnToggleActive_Click;
-
-            editorPanel.Controls.Add(lblMode);
-            editorPanel.Controls.Add(lblFullName);
-            editorPanel.Controls.Add(txtFullName);
-            editorPanel.Controls.Add(lblUsername);
-            editorPanel.Controls.Add(txtUsername);
-            editorPanel.Controls.Add(lblRole);
-            editorPanel.Controls.Add(cmbRole);
-            editorPanel.Controls.Add(lblPhone);
-            editorPanel.Controls.Add(txtPhone);
-            editorPanel.Controls.Add(lblEmail);
-            editorPanel.Controls.Add(txtEmail);
-            editorPanel.Controls.Add(chkIsActive);
-            editorPanel.Controls.Add(lblPassword);
-            editorPanel.Controls.Add(txtPassword);
-            editorPanel.Controls.Add(lblConfirmPassword);
-            editorPanel.Controls.Add(txtConfirmPassword);
-            editorPanel.Controls.Add(btnSave);
-            editorPanel.Controls.Add(btnResetPassword);
-            editorPanel.Controls.Add(btnToggleActive);
-
-            lblStatus = new Label
-            {
-                Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
-                AutoSize = true,
-                ForeColor = Color.DimGray,
-                Location = new Point(28, 626),
-                Text = "Ready."
-            };
-
-            Controls.Add(header);
-            Controls.Add(leftPanel);
-            Controls.Add(editorPanel);
-            Controls.Add(lblStatus);
+            AdjustSplitter();
         }
 
         private void LoadRoles()
@@ -288,17 +66,20 @@ namespace Housing_rental.Forms.Admin
         private void StartNewUser()
         {
             _selectedUserId = 0;
-            lblMode.Text = "New User";
+            lblMode.Text = "Create User";
+            btnSave.Text = "Create User";
             txtFullName.Clear();
             txtUsername.Clear();
             txtPhone.Clear();
             txtEmail.Clear();
             txtPassword.Clear();
             txtConfirmPassword.Clear();
+            SetPasswordVisibility(false);
             chkIsActive.Checked = true;
             btnResetPassword.Enabled = false;
             btnToggleActive.Enabled = false;
             btnToggleActive.Text = "Deactivate";
+            lblPasswordHelp.Text = "Password and confirm password are required when creating a new user.";
 
             if (cmbRole.Items.Count > 0)
             {
@@ -317,17 +98,20 @@ namespace Housing_rental.Forms.Admin
 
             _selectedUserId = user.UserId;
             lblMode.Text = "Edit User";
+            btnSave.Text = "Save Changes";
             txtFullName.Text = user.FullName;
             txtUsername.Text = user.Username;
             txtPhone.Text = user.Phone;
             txtEmail.Text = user.Email;
             txtPassword.Clear();
             txtConfirmPassword.Clear();
+            SetPasswordVisibility(false);
             chkIsActive.Checked = user.IsActive;
             cmbRole.SelectedValue = user.RoleId;
             btnResetPassword.Enabled = true;
             btnToggleActive.Enabled = true;
             btnToggleActive.Text = user.IsActive ? "Deactivate" : "Activate";
+            lblPasswordHelp.Text = "Leave password fields empty unless you want to reset this user's password.";
         }
 
         private User ReadUserFromForm()
@@ -446,6 +230,7 @@ namespace Housing_rental.Forms.Admin
 
             txtPassword.Clear();
             txtConfirmPassword.Clear();
+            SetPasswordVisibility(false);
             SetStatus(result.Message, false);
         }
 
@@ -497,59 +282,38 @@ namespace Housing_rental.Forms.Admin
             LoadSelectedUser(_userBindingSource.Current as User);
         }
 
-        private void AddGridColumn(string propertyName, string headerText, int width)
+        private void BtnTogglePassword_Click(object sender, EventArgs e)
         {
-            dgvUsers.Columns.Add(new DataGridViewTextBoxColumn
-            {
-                DataPropertyName = propertyName,
-                HeaderText = headerText,
-                Name = propertyName,
-                Width = width
-            });
+            TogglePasswordVisibility(txtPassword, btnTogglePassword);
         }
 
-        private Label CreateLabel(string text, int x, int y)
+        private void BtnToggleConfirmPassword_Click(object sender, EventArgs e)
         {
-            return new Label
-            {
-                AutoSize = true,
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-                Location = new Point(x, y),
-                Text = text
-            };
+            TogglePasswordVisibility(txtConfirmPassword, btnToggleConfirmPassword);
         }
 
-        private TextBox CreateTextBox(int x, int y, int width)
+        private void SetPasswordVisibility(bool visible)
         {
-            return new TextBox
-            {
-                Location = new Point(x, y),
-                Size = new Size(width, 27)
-            };
+            txtPassword.PasswordChar = visible ? '\0' : '*';
+            txtConfirmPassword.PasswordChar = visible ? '\0' : '*';
+            btnTogglePassword.Text = visible ? "\u25D0" : "\u25C9";
+            btnToggleConfirmPassword.Text = visible ? "\u25D0" : "\u25C9";
+            passwordToolTip.SetToolTip(btnTogglePassword, visible ? "Hide password" : "Show password");
+            passwordToolTip.SetToolTip(btnToggleConfirmPassword, visible ? "Hide confirm password" : "Show confirm password");
         }
 
-        private TextBox CreatePasswordBox(int x, int y, int width)
+        private void TogglePasswordVisibility(TextBox textBox, Button button)
         {
-            TextBox textBox = CreateTextBox(x, y, width);
-            textBox.PasswordChar = '*';
-            return textBox;
-        }
-
-        private Button CreateButton(string text, int x, int y, int width, int height)
-        {
-            return new Button
-            {
-                Location = new Point(x, y),
-                Size = new Size(width, height),
-                Text = text,
-                UseVisualStyleBackColor = true
-            };
+            bool willShow = textBox.PasswordChar != '\0';
+            textBox.PasswordChar = willShow ? '\0' : '*';
+            button.Text = willShow ? "\u25D0" : "\u25C9";
+            passwordToolTip.SetToolTip(button, willShow ? "Hide password" : "Show password");
         }
 
         private void SetStatus(string message, bool isError)
         {
             lblStatus.Text = message;
-            lblStatus.ForeColor = isError ? Color.Firebrick : Color.ForestGreen;
+            lblStatus.ForeColor = isError ? Color.FromArgb(239, 68, 68) : Color.FromArgb(16, 185, 129);
         }
     }
 }

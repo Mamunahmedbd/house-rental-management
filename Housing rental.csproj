@@ -56,6 +56,7 @@
     <Compile Include="BLL\RentPaymentService.cs" />
     <Compile Include="BLL\TenantService.cs" />
     <Compile Include="BLL\UserService.cs" />
+    <Compile Include="ApplicationSessionContext.cs" />
     <Compile Include="DAL\AuditRepository.cs" />
     <Compile Include="DAL\DashboardRepository.cs" />
     <Compile Include="DAL\DbConnectionFactory.cs" />
@@ -64,6 +65,9 @@
     <Compile Include="DAL\UserRepository.cs" />
     <Compile Include="Forms\Admin\UserManagementControl.cs">
       <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Forms\Admin\UserManagementControl.Designer.cs">
+      <DependentUpon>UserManagementControl.cs</DependentUpon>
     </Compile>
     <Compile Include="Forms\Auth\FrmLogin.cs">
       <SubType>Form</SubType>
