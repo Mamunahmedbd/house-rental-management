@@ -177,7 +177,7 @@ namespace Housing_rental.Forms.Tenants
             splitContainer.Resize += SplitContainer_Resize;
 
             Panel listPanel = CreateSurfacePanel();
-            listPanel.Padding = new Padding(18);
+            listPanel.Padding = new Padding(0);
             dgvTenants = CreateGrid(_tenantBindingSource);
             dgvTenants.SelectionChanged += DgvTenants_SelectionChanged;
             AddGridColumn(dgvTenants, "FullName", "Tenant", 24);
@@ -266,7 +266,8 @@ namespace Housing_rental.Forms.Tenants
             detailsLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 42F));
 
             Panel occupancyPanel = CreateSurfacePanel();
-            occupancyPanel.Padding = new Padding(18);
+            occupancyPanel.Padding = new Padding(0);
+            occupancyPanel.Margin = new Padding(0, 0, 0, 8);
             dgvCurrentOccupancy = CreateGrid(_currentOccupancyBindingSource);
             AddGridColumn(dgvCurrentOccupancy, "AgreementNo", "Agreement", 14);
             AddGridColumn(dgvCurrentOccupancy, "PropertyName", "Property", 18);
@@ -280,7 +281,8 @@ namespace Housing_rental.Forms.Tenants
             occupancyPanel.Controls.Add(dgvCurrentOccupancy);
 
             Panel balancePanel = CreateSurfacePanel();
-            balancePanel.Padding = new Padding(18);
+            balancePanel.Padding = new Padding(0);
+            balancePanel.Margin = new Padding(0, 8, 0, 0);
             dgvBalance = CreateGrid(_balanceBindingSource);
             AddGridColumn(dgvBalance, "FullName", "Tenant", 22);
             AddGridColumn(dgvBalance, "TotalDue", "Total Due", 16);
@@ -298,7 +300,7 @@ namespace Housing_rental.Forms.Tenants
         private void BuildAgreementsTab()
         {
             Panel surface = CreateSurfacePanel();
-            surface.Padding = new Padding(18);
+            surface.Padding = new Padding(0);
             dgvAgreements = CreateGrid(_agreementHistoryBindingSource);
             AddGridColumn(dgvAgreements, "AgreementNo", "Agreement", 14);
             AddGridColumn(dgvAgreements, "PropertyName", "Property", 18);
@@ -316,7 +318,7 @@ namespace Housing_rental.Forms.Tenants
         private void BuildPaymentsTab()
         {
             Panel surface = CreateSurfacePanel();
-            surface.Padding = new Padding(18);
+            surface.Padding = new Padding(0);
             dgvPayments = CreateGrid(_paymentHistoryBindingSource);
             AddGridColumn(dgvPayments, "ReceiptNo", "Receipt", 14);
             AddGridColumn(dgvPayments, "PaymentMonth", "Month", 8);

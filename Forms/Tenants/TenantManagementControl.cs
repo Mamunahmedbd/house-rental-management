@@ -305,23 +305,48 @@ namespace Housing_rental.Forms.Tenants
             {
                 btnToggleStatus.Text = "Deactivate";
                 btnBlacklist.Text = "Blacklist";
+                
+                // Red theme for Deactivate
                 btnToggleStatus.ForeColor = Color.FromArgb(220, 38, 38);
-                btnBlacklist.ForeColor = Color.FromArgb(180, 83, 9);
+                btnToggleStatus.FlatAppearance.MouseOverBackColor = Color.FromArgb(254, 242, 242);
+                btnToggleStatus.FlatAppearance.MouseDownBackColor = Color.FromArgb(254, 226, 226);
+                
+                // Amber theme for Blacklist
+                btnBlacklist.ForeColor = Color.FromArgb(217, 119, 6);
+                btnBlacklist.FlatAppearance.MouseOverBackColor = Color.FromArgb(254, 243, 199);
+                btnBlacklist.FlatAppearance.MouseDownBackColor = Color.FromArgb(253, 230, 138);
                 btnBlacklist.Enabled = CurrentSession.IsAdmin;
             }
             else if (status == "Inactive")
             {
                 btnToggleStatus.Text = "Activate";
                 btnBlacklist.Text = "Blacklist";
+                
+                // Green theme for Activate
                 btnToggleStatus.ForeColor = Color.FromArgb(22, 163, 74);
-                btnBlacklist.ForeColor = Color.FromArgb(180, 83, 9);
+                btnToggleStatus.FlatAppearance.MouseOverBackColor = Color.FromArgb(240, 253, 250);
+                btnToggleStatus.FlatAppearance.MouseDownBackColor = Color.FromArgb(204, 251, 241);
+                
+                // Amber theme for Blacklist
+                btnBlacklist.ForeColor = Color.FromArgb(217, 119, 6);
+                btnBlacklist.FlatAppearance.MouseOverBackColor = Color.FromArgb(254, 243, 199);
+                btnBlacklist.FlatAppearance.MouseDownBackColor = Color.FromArgb(253, 230, 138);
                 btnBlacklist.Enabled = CurrentSession.IsAdmin;
             }
             else
             {
                 btnToggleStatus.Text = "Reactivate";
                 btnBlacklist.Text = "Blacklisted";
+                
+                // Green theme for Reactivate
                 btnToggleStatus.ForeColor = Color.FromArgb(22, 163, 74);
+                btnToggleStatus.FlatAppearance.MouseOverBackColor = Color.FromArgb(240, 253, 250);
+                btnToggleStatus.FlatAppearance.MouseDownBackColor = Color.FromArgb(204, 251, 241);
+                
+                // Solid highlight red for Blacklisted warning indicator
+                btnBlacklist.BackColor = Color.FromArgb(220, 38, 38);
+                btnBlacklist.ForeColor = Color.White;
+                btnBlacklist.FlatAppearance.BorderColor = Color.FromArgb(220, 38, 38);
                 btnBlacklist.Enabled = false;
             }
         }
