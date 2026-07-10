@@ -1,0 +1,8 @@
+IF DB_ID(N'HouseRentalDB') IS NULL
+BEGIN
+    CREATE DATABASE HouseRentalDB;
+END
+GO
+
+USE HouseRentalDB;
+GO

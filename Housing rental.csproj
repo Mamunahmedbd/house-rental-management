@@ -34,6 +34,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
+    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
@@ -46,12 +47,52 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Form1.cs">
+    <Compile Include="BLL\AgreementService.cs" />
+    <Compile Include="BLL\AuthService.cs" />
+    <Compile Include="BLL\CurrentSession.cs" />
+    <Compile Include="BLL\DashboardService.cs" />
+    <Compile Include="BLL\PasswordHasher.cs" />
+    <Compile Include="BLL\PropertyService.cs" />
+    <Compile Include="BLL\RentPaymentService.cs" />
+    <Compile Include="BLL\TenantService.cs" />
+    <Compile Include="BLL\UserService.cs" />
+    <Compile Include="DAL\AuditRepository.cs" />
+    <Compile Include="DAL\DashboardRepository.cs" />
+    <Compile Include="DAL\DbConnectionFactory.cs" />
+    <Compile Include="DAL\RoleRepository.cs" />
+    <Compile Include="DAL\SqlHelper.cs" />
+    <Compile Include="DAL\UserRepository.cs" />
+    <Compile Include="Forms\Admin\UserManagementControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Forms\Auth\FrmLogin.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="Form1.Designer.cs">
-      <DependentUpon>Form1.cs</DependentUpon>
+    <Compile Include="Forms\Auth\FrmLogin.Designer.cs">
+      <DependentUpon>FrmLogin.cs</DependentUpon>
     </Compile>
+    <Compile Include="Forms\Common\ModulePlaceholderControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Forms\Dashboard\FrmDashboard.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\Dashboard\FrmDashboard.Designer.cs">
+      <DependentUpon>FrmDashboard.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Models\AuditLog.cs" />
+    <Compile Include="Models\DashboardSummary.cs" />
+    <Compile Include="Models\Expense.cs" />
+    <Compile Include="Models\House.cs" />
+    <Compile Include="Models\MaintenanceRequest.cs" />
+    <Compile Include="Models\Property.cs" />
+    <Compile Include="Models\RentalAgreement.cs" />
+    <Compile Include="Models\RentPayment.cs" />
+    <Compile Include="Models\Role.cs" />
+    <Compile Include="Models\Room.cs" />
+    <Compile Include="Models\ServiceResult.cs" />
+    <Compile Include="Models\Tenant.cs" />
+    <Compile Include="Models\User.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="Properties\Resources.resx">
@@ -74,7 +115,16 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
+    <None Include=".gitignore" />
     <None Include="App.config" />
+    <None Include="Database\01_CreateDatabase.sql" />
+    <None Include="Database\02_CreateTables.sql" />
+    <None Include="Database\03_CreateViews.sql" />
+    <None Include="Database\04_CreateStoredProcedures.sql" />
+    <None Include="Database\05_SeedData.sql" />
+    <None Include="docs\HOUSE_RENTAL_MANAGEMENT_PROJECT_PLAN.md" />
+    <None Include="docs\PROJECT_PLANNING_AND_ARCHITECTURE.md" />
+    <None Include="README.md" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

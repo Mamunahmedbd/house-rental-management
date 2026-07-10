@@ -6,3 +6,9 @@
 *.suo
 *.userosscache
 *.sln.docstates
+
+# Common local files
+*.log
+*.cache
+Thumbs.db
+Desktop.ini
