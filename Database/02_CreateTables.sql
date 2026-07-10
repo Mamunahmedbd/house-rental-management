@@ -104,6 +104,16 @@ CREATE TABLE dbo.Tenants
     CONSTRAINT CK_Tenants_Status CHECK (Status IN ('Active', 'Inactive', 'Blacklisted'))
 );
 
+CREATE UNIQUE INDEX UX_Tenants_NationalId
+ON dbo.Tenants(NationalId)
+WHERE NationalId IS NOT NULL AND NationalId <> '';
+
+CREATE INDEX IX_Tenants_Status_FullName
+ON dbo.Tenants(Status, FullName);
+
+CREATE INDEX IX_Tenants_Phone
+ON dbo.Tenants(Phone);
+
 CREATE TABLE dbo.RentalAgreements
 (
     AgreementId INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_RentalAgreements PRIMARY KEY,

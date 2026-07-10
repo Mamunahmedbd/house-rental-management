@@ -63,6 +63,7 @@
     <Compile Include="DAL\PropertyRepository.cs" />
     <Compile Include="DAL\RoleRepository.cs" />
     <Compile Include="DAL\SqlHelper.cs" />
+    <Compile Include="DAL\TenantRepository.cs" />
     <Compile Include="DAL\UserRepository.cs" />
     <Compile Include="Forms\Admin\UserManagementControl.cs">
       <SubType>UserControl</SubType>
@@ -90,6 +91,12 @@
     </Compile>
     <Compile Include="Forms\Properties\PropertyManagementControl.Designer.cs">
       <DependentUpon>PropertyManagementControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\Tenants\TenantManagementControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Forms\Tenants\TenantManagementControl.Designer.cs">
+      <DependentUpon>TenantManagementControl.cs</DependentUpon>
     </Compile>
     <Compile Include="Models\AuditLog.cs" />
     <Compile Include="Models\DashboardSummary.cs" />
@@ -136,6 +143,7 @@
     <None Include="docs\HOUSE_RENTAL_MANAGEMENT_PROJECT_PLAN.md" />
     <None Include="docs\PROPERTIES_MODULE_IMPLEMENTATION_PLAN.md" />
     <None Include="docs\PROJECT_PLANNING_AND_ARCHITECTURE.md" />
+    <None Include="docs\TENANTS_MODULE_IMPLEMENTATION_PLAN.md" />
     <None Include="README.md" />
     <Content Include="Assets\login_bg.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

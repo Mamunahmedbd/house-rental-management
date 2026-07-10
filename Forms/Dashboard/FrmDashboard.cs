@@ -5,6 +5,7 @@ using Housing_rental.BLL;
 using Housing_rental.Forms.Admin;
 using Housing_rental.Forms.Common;
 using Housing_rental.Forms.Properties;
+using Housing_rental.Forms.Tenants;
 using Housing_rental.Models;
 
 namespace Housing_rental.Forms.Dashboard
@@ -69,7 +70,7 @@ namespace Housing_rental.Forms.Dashboard
         private void BtnTenants_Click(object sender, EventArgs e)
         {
             SetActiveButton(sender as Button);
-            ShowModule("Tenant Management", "This module will manage tenant profiles, contact information, emergency contacts, agreement history, and payment history.");
+            NavigateToControl("Tenant Management", new TenantManagementControl());
         }
 
         private void BtnAgreements_Click(object sender, EventArgs e)
