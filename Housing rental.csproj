@@ -53,8 +53,17 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Models\ReportModels.cs" />
+    <Compile Include="Models\AppSettingItem.cs" />
     <Compile Include="BLL\ReportService.cs" />
+    <Compile Include="BLL\SettingsService.cs" />
     <Compile Include="DAL\ReportRepository.cs" />
+    <Compile Include="DAL\SettingsRepository.cs" />
+    <Compile Include="Forms\Settings\SettingsManagementControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Forms\Settings\SettingsManagementControl.Designer.cs">
+      <DependentUpon>SettingsManagementControl.cs</DependentUpon>
+    </Compile>
     <Compile Include="Forms\Reports\ReportManagementControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
@@ -179,6 +188,9 @@
     <None Include="Database\Tests\PaymentsReadModelSmokeTest.sql" />
     <None Include="Database\Migrations\20260711_003_ReportProcedures.sql" />
     <None Include="Database\Tests\ReportProceduresSmokeTest.sql" />
+    <None Include="Database\Migrations\20260711_004_SettingsStoredProcedures.sql" />
+    <None Include="Database\Tests\SettingsStoredProceduresSmokeTest.sql" />
+    <None Include="docs\SETTINGS_MODULE_IMPLEMENTATION_PLAN.md" />
     <None Include="docs\AGREEMENTS_MODULE_IMPLEMENTATION_PLAN.md" />
     <None Include="docs\HOUSE_RENTAL_MANAGEMENT_PROJECT_PLAN.md" />
     <None Include="docs\PAYMENTS_MODULE_IMPLEMENTATION_PLAN.md" />

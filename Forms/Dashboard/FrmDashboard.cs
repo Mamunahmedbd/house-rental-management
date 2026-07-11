@@ -9,6 +9,7 @@ using Housing_rental.Forms.Payments;
 using Housing_rental.Forms.Properties;
 using Housing_rental.Forms.Tenants;
 using Housing_rental.Forms.Reports;
+using Housing_rental.Forms.Settings;
 using Housing_rental.Models;
 
 namespace Housing_rental.Forms.Dashboard
@@ -33,7 +34,7 @@ namespace Housing_rental.Forms.Dashboard
 
             lblCurrentUser.Text = "User: " + CurrentSession.User.FullName + " (" + CurrentSession.User.RoleName + ")";
             btnUsers.Visible = CurrentSession.IsAdmin;
-            btnSettings.Visible = CurrentSession.IsAdmin;
+            btnSettings.Visible = true;
 
             SetActiveButton(btnDashboard);
             ShowDashboard();
@@ -103,7 +104,7 @@ namespace Housing_rental.Forms.Dashboard
         private void BtnSettings_Click(object sender, EventArgs e)
         {
             SetActiveButton(sender as Button);
-            ShowModule("Settings", "This Admin module will manage application settings such as currency, receipt footer, and rent due day.");
+            NavigateToControl("Settings", new SettingsManagementControl());
         }
 
         private void ShowModule(string moduleName, string description)
