@@ -29,6 +29,17 @@ namespace Housing_rental.Forms.Dashboard
         private System.Windows.Forms.Label lblActiveAgreements;
         private System.Windows.Forms.Label lblMonthlyCollected;
         private System.Windows.Forms.Label lblMonthlyDue;
+        private System.Windows.Forms.Panel pnlTotalProperties;
+        private System.Windows.Forms.Panel pnlTotalRooms;
+        private System.Windows.Forms.Panel pnlAvailableRooms;
+        private System.Windows.Forms.Panel pnlOccupiedRooms;
+        private System.Windows.Forms.Panel pnlTotalTenants;
+        private System.Windows.Forms.Panel pnlActiveAgreements;
+        private System.Windows.Forms.Panel pnlMonthlyCollected;
+        private System.Windows.Forms.Panel pnlMonthlyDue;
+        private System.Windows.Forms.Panel pnlWelcomeBanner;
+        private System.Windows.Forms.Label lblWelcomeTitle;
+        private System.Windows.Forms.Label lblWelcomeSubtitle;
 
         protected override void Dispose(bool disposing)
         {
@@ -68,6 +79,9 @@ namespace Housing_rental.Forms.Dashboard
             this.lblMonthlyCollected = new System.Windows.Forms.Label();
             this.lblMonthlyDue = new System.Windows.Forms.Label();
             this.lblStatus = new System.Windows.Forms.Label();
+            this.pnlWelcomeBanner = new System.Windows.Forms.Panel();
+            this.lblWelcomeTitle = new System.Windows.Forms.Label();
+            this.lblWelcomeSubtitle = new System.Windows.Forms.Label();
             this.pnlSidebar.SuspendLayout();
             this.pnlHeader.SuspendLayout();
             this.pnlContent.SuspendLayout();
@@ -134,11 +148,13 @@ namespace Housing_rental.Forms.Dashboard
             this.pnlHeader.Name = "pnlHeader";
             this.pnlHeader.Size = new System.Drawing.Size(944, 88);
             this.pnlHeader.TabIndex = 1;
+            this.pnlHeader.Paint += new System.Windows.Forms.PaintEventHandler(this.HeaderPanel_Paint);
             // 
             // pnlContent
             // 
-            this.pnlContent.BackColor = System.Drawing.Color.FromArgb(245, 247, 250);
+            this.pnlContent.BackColor = System.Drawing.Color.FromArgb(248, 250, 252);
             this.pnlContent.Controls.Add(this.lblStatus);
+            this.pnlContent.Controls.Add(this.pnlWelcomeBanner);
             this.pnlContent.Controls.Add(this.dashboardGrid);
             this.pnlContent.Dock = System.Windows.Forms.DockStyle.Fill;
             this.pnlContent.Location = new System.Drawing.Point(190, 88);
@@ -149,45 +165,97 @@ namespace Housing_rental.Forms.Dashboard
             // btnLogout
             // 
             this.btnLogout.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnLogout.BackColor = System.Drawing.Color.FromArgb(241, 245, 249);
+            this.btnLogout.ForeColor = System.Drawing.Color.FromArgb(220, 38, 38);
+            this.btnLogout.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnLogout.FlatAppearance.BorderSize = 1;
+            this.btnLogout.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(226, 232, 240);
+            this.btnLogout.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(254, 242, 242);
+            this.btnLogout.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(254, 226, 226);
+            this.btnLogout.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold);
             this.btnLogout.Location = new System.Drawing.Point(832, 28);
             this.btnLogout.Name = "btnLogout";
             this.btnLogout.Size = new System.Drawing.Size(88, 34);
             this.btnLogout.TabIndex = 3;
             this.btnLogout.Text = "Logout";
-            this.btnLogout.UseVisualStyleBackColor = true;
+            this.btnLogout.UseVisualStyleBackColor = false;
             this.btnLogout.Click += new System.EventHandler(this.BtnLogout_Click);
             // 
             // btnRefresh
             // 
             this.btnRefresh.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnRefresh.BackColor = System.Drawing.Color.FromArgb(37, 99, 235);
+            this.btnRefresh.ForeColor = System.Drawing.Color.White;
+            this.btnRefresh.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnRefresh.FlatAppearance.BorderSize = 0;
+            this.btnRefresh.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(30, 64, 175);
+            this.btnRefresh.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(29, 78, 216);
+            this.btnRefresh.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold);
             this.btnRefresh.Location = new System.Drawing.Point(738, 28);
             this.btnRefresh.Name = "btnRefresh";
             this.btnRefresh.Size = new System.Drawing.Size(88, 34);
             this.btnRefresh.TabIndex = 2;
             this.btnRefresh.Text = "Refresh";
-            this.btnRefresh.UseVisualStyleBackColor = true;
+            this.btnRefresh.UseVisualStyleBackColor = false;
             this.btnRefresh.Click += new System.EventHandler(this.BtnRefresh_Click);
             // 
             // lblCurrentUser
             // 
             this.lblCurrentUser.AutoSize = true;
-            this.lblCurrentUser.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.lblCurrentUser.ForeColor = System.Drawing.Color.DimGray;
-            this.lblCurrentUser.Location = new System.Drawing.Point(24, 55);
+            this.lblCurrentUser.Font = new System.Drawing.Font("Segoe UI", 9.5F);
+            this.lblCurrentUser.ForeColor = System.Drawing.Color.FromArgb(100, 116, 139);
+            this.lblCurrentUser.Location = new System.Drawing.Point(24, 54);
             this.lblCurrentUser.Name = "lblCurrentUser";
-            this.lblCurrentUser.Size = new System.Drawing.Size(35, 15);
+            this.lblCurrentUser.Size = new System.Drawing.Size(38, 17);
             this.lblCurrentUser.TabIndex = 1;
             this.lblCurrentUser.Text = "User:";
             // 
             // lblTitle
             // 
             this.lblTitle.AutoSize = true;
-            this.lblTitle.Font = new System.Drawing.Font("Segoe UI", 18F, System.Drawing.FontStyle.Bold);
-            this.lblTitle.Location = new System.Drawing.Point(21, 18);
+            this.lblTitle.Font = new System.Drawing.Font("Segoe UI", 20F, System.Drawing.FontStyle.Bold);
+            this.lblTitle.ForeColor = System.Drawing.Color.FromArgb(15, 23, 42);
+            this.lblTitle.Location = new System.Drawing.Point(21, 14);
             this.lblTitle.Name = "lblTitle";
-            this.lblTitle.Size = new System.Drawing.Size(140, 32);
+            this.lblTitle.Size = new System.Drawing.Size(155, 37);
             this.lblTitle.TabIndex = 0;
             this.lblTitle.Text = "Dashboard";
+            // 
+            // pnlWelcomeBanner
+            // 
+            this.pnlWelcomeBanner.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.pnlWelcomeBanner.Controls.Add(this.lblWelcomeTitle);
+            this.pnlWelcomeBanner.Controls.Add(this.lblWelcomeSubtitle);
+            this.pnlWelcomeBanner.Location = new System.Drawing.Point(28, 24);
+            this.pnlWelcomeBanner.Name = "pnlWelcomeBanner";
+            this.pnlWelcomeBanner.Size = new System.Drawing.Size(884, 90);
+            this.pnlWelcomeBanner.TabIndex = 4;
+            this.pnlWelcomeBanner.Paint += new System.Windows.Forms.PaintEventHandler(this.WelcomeBanner_Paint);
+            // 
+            // lblWelcomeTitle
+            // 
+            this.lblWelcomeTitle.AutoSize = true;
+            this.lblWelcomeTitle.BackColor = System.Drawing.Color.Transparent;
+            this.lblWelcomeTitle.Font = new System.Drawing.Font("Segoe UI", 14F, System.Drawing.FontStyle.Bold);
+            this.lblWelcomeTitle.ForeColor = System.Drawing.Color.White;
+            this.lblWelcomeTitle.Location = new System.Drawing.Point(20, 20);
+            this.lblWelcomeTitle.Name = "lblWelcomeTitle";
+            this.lblWelcomeTitle.Size = new System.Drawing.Size(150, 25);
+            this.lblWelcomeTitle.TabIndex = 0;
+            this.lblWelcomeTitle.Text = "Welcome back!";
+            // 
+            // lblWelcomeSubtitle
+            // 
+            this.lblWelcomeSubtitle.AutoSize = true;
+            this.lblWelcomeSubtitle.BackColor = System.Drawing.Color.Transparent;
+            this.lblWelcomeSubtitle.Font = new System.Drawing.Font("Segoe UI", 9.5F);
+            this.lblWelcomeSubtitle.ForeColor = System.Drawing.Color.FromArgb(219, 234, 254);
+            this.lblWelcomeSubtitle.Location = new System.Drawing.Point(20, 48);
+            this.lblWelcomeSubtitle.Name = "lblWelcomeSubtitle";
+            this.lblWelcomeSubtitle.Size = new System.Drawing.Size(370, 17);
+            this.lblWelcomeSubtitle.TabIndex = 1;
+            this.lblWelcomeSubtitle.Text = "Here\'s a quick overview of your rental properties and payments.";
             // 
             // dashboardGrid
             // 
@@ -199,42 +267,42 @@ namespace Housing_rental.Forms.Dashboard
             this.dashboardGrid.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 25F));
             this.dashboardGrid.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 25F));
             this.dashboardGrid.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 25F));
-            this.dashboardGrid.Controls.Add(this.lblTotalProperties, 0, 0);
-            this.dashboardGrid.Controls.Add(this.lblTotalRooms, 1, 0);
-            this.dashboardGrid.Controls.Add(this.lblAvailableRooms, 2, 0);
-            this.dashboardGrid.Controls.Add(this.lblOccupiedRooms, 3, 0);
-            this.dashboardGrid.Controls.Add(this.lblTotalTenants, 0, 1);
-            this.dashboardGrid.Controls.Add(this.lblActiveAgreements, 1, 1);
-            this.dashboardGrid.Controls.Add(this.lblMonthlyCollected, 2, 1);
-            this.dashboardGrid.Controls.Add(this.lblMonthlyDue, 3, 1);
-            this.dashboardGrid.Location = new System.Drawing.Point(28, 40);
+            this.dashboardGrid.Location = new System.Drawing.Point(28, 138);
             this.dashboardGrid.Name = "dashboardGrid";
             this.dashboardGrid.RowCount = 2;
             this.dashboardGrid.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50F));
             this.dashboardGrid.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50F));
-            this.dashboardGrid.Size = new System.Drawing.Size(884, 300);
+            this.dashboardGrid.Size = new System.Drawing.Size(884, 390);
             this.dashboardGrid.TabIndex = 2;
-            // 
-            // summary labels
-            // 
-            ConfigureSummaryLabel(this.lblTotalProperties, "0\nTotal Properties");
-            ConfigureSummaryLabel(this.lblTotalRooms, "0\nTotal Rooms");
-            ConfigureSummaryLabel(this.lblAvailableRooms, "0\nAvailable Rooms");
-            ConfigureSummaryLabel(this.lblOccupiedRooms, "0\nOccupied Rooms");
-            ConfigureSummaryLabel(this.lblTotalTenants, "0\nTotal Tenants");
-            ConfigureSummaryLabel(this.lblActiveAgreements, "0\nActive Agreements");
-            ConfigureSummaryLabel(this.lblMonthlyCollected, "$0.00\nMonthly Collected");
-            ConfigureSummaryLabel(this.lblMonthlyDue, "$0.00\nMonthly Due");
+
+            // Configure Cards
+            this.pnlTotalProperties = CreateCardPanel(this.lblTotalProperties, "Total Properties", "\uE80F", System.Drawing.Color.FromArgb(239, 246, 255), System.Drawing.Color.FromArgb(37, 99, 235));
+            this.pnlTotalRooms = CreateCardPanel(this.lblTotalRooms, "Total Rooms", "\uEA37", System.Drawing.Color.FromArgb(245, 243, 255), System.Drawing.Color.FromArgb(139, 92, 246));
+            this.pnlAvailableRooms = CreateCardPanel(this.lblAvailableRooms, "Available Rooms", "\uE8E1", System.Drawing.Color.FromArgb(240, 253, 244), System.Drawing.Color.FromArgb(22, 163, 74));
+            this.pnlOccupiedRooms = CreateCardPanel(this.lblOccupiedRooms, "Occupied Rooms", "\uE716", System.Drawing.Color.FromArgb(254, 242, 242), System.Drawing.Color.FromArgb(220, 38, 38));
+            this.pnlTotalTenants = CreateCardPanel(this.lblTotalTenants, "Total Tenants", "\uE77B", System.Drawing.Color.FromArgb(236, 253, 245), System.Drawing.Color.FromArgb(5, 150, 105));
+            this.pnlActiveAgreements = CreateCardPanel(this.lblActiveAgreements, "Active Agreements", "\uE8A5", System.Drawing.Color.FromArgb(255, 251, 235), System.Drawing.Color.FromArgb(217, 119, 6));
+            this.pnlMonthlyCollected = CreateCardPanel(this.lblMonthlyCollected, "Monthly Collected", "\uE94C", System.Drawing.Color.FromArgb(240, 253, 250), System.Drawing.Color.FromArgb(13, 148, 136));
+            this.pnlMonthlyDue = CreateCardPanel(this.lblMonthlyDue, "Monthly Due", "\uE7BA", System.Drawing.Color.FromArgb(255, 241, 242), System.Drawing.Color.FromArgb(225, 29, 72));
+
+            this.dashboardGrid.Controls.Add(this.pnlTotalProperties, 0, 0);
+            this.dashboardGrid.Controls.Add(this.pnlTotalRooms, 1, 0);
+            this.dashboardGrid.Controls.Add(this.pnlAvailableRooms, 2, 0);
+            this.dashboardGrid.Controls.Add(this.pnlOccupiedRooms, 3, 0);
+            this.dashboardGrid.Controls.Add(this.pnlTotalTenants, 0, 1);
+            this.dashboardGrid.Controls.Add(this.pnlActiveAgreements, 1, 1);
+            this.dashboardGrid.Controls.Add(this.pnlMonthlyCollected, 2, 1);
+            this.dashboardGrid.Controls.Add(this.pnlMonthlyDue, 3, 1);
             // 
             // lblStatus
             // 
             this.lblStatus.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.lblStatus.AutoSize = true;
-            this.lblStatus.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.lblStatus.ForeColor = System.Drawing.Color.DimGray;
+            this.lblStatus.Font = new System.Drawing.Font("Segoe UI", 9.5F);
+            this.lblStatus.ForeColor = System.Drawing.Color.FromArgb(100, 116, 139);
             this.lblStatus.Location = new System.Drawing.Point(28, 552);
             this.lblStatus.Name = "lblStatus";
-            this.lblStatus.Size = new System.Drawing.Size(40, 15);
+            this.lblStatus.Size = new System.Drawing.Size(43, 17);
             this.lblStatus.TabIndex = 3;
             this.lblStatus.Text = "Ready.";
             // 
@@ -242,7 +310,7 @@ namespace Housing_rental.Forms.Dashboard
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.BackColor = System.Drawing.Color.FromArgb(245, 247, 250);
+            this.BackColor = System.Drawing.Color.FromArgb(248, 250, 252);
             this.ClientSize = new System.Drawing.Size(1134, 681);
             this.Controls.Add(this.pnlContent);
             this.Controls.Add(this.pnlHeader);
@@ -284,15 +352,52 @@ namespace Housing_rental.Forms.Dashboard
             button.Paint += new System.Windows.Forms.PaintEventHandler(this.SidebarButton_Paint);
         }
 
-        private void ConfigureSummaryLabel(System.Windows.Forms.Label label, string text)
+        private System.Windows.Forms.Panel CreateCardPanel(
+            System.Windows.Forms.Label valLabel, 
+            string title, 
+            string iconGlyph, 
+            System.Drawing.Color iconBgColor, 
+            System.Drawing.Color iconFgColor)
         {
-            label.BackColor = System.Drawing.Color.White;
-            label.Dock = System.Windows.Forms.DockStyle.Fill;
-            label.Font = new System.Drawing.Font("Segoe UI", 13F, System.Drawing.FontStyle.Bold);
-            label.ForeColor = System.Drawing.Color.FromArgb(37, 52, 73);
-            label.Margin = new System.Windows.Forms.Padding(10);
-            label.Text = text;
-            label.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            var pnl = new System.Windows.Forms.Panel();
+            pnl.BackColor = System.Drawing.Color.White;
+            pnl.Dock = System.Windows.Forms.DockStyle.Fill;
+            pnl.Margin = new System.Windows.Forms.Padding(12);
+            pnl.Padding = new System.Windows.Forms.Padding(16);
+            pnl.Paint += new System.Windows.Forms.PaintEventHandler(this.CardPanel_Paint);
+
+            var lblIcon = new System.Windows.Forms.Label();
+            lblIcon.Text = iconGlyph;
+            lblIcon.ForeColor = iconFgColor;
+            lblIcon.Tag = iconBgColor; // Store circle bg color in Tag
+            lblIcon.Size = new System.Drawing.Size(48, 48);
+            lblIcon.Location = new System.Drawing.Point(16, 16);
+            lblIcon.Paint += new System.Windows.Forms.PaintEventHandler(this.CardIcon_Paint);
+            lblIcon.Anchor = System.Windows.Forms.AnchorStyles.Left;
+
+            valLabel.BackColor = System.Drawing.Color.Transparent;
+            valLabel.Font = new System.Drawing.Font("Segoe UI", 18F, System.Drawing.FontStyle.Bold);
+            valLabel.ForeColor = System.Drawing.Color.FromArgb(15, 23, 42); // slate-900
+            valLabel.Location = new System.Drawing.Point(76, 14);
+            valLabel.Size = new System.Drawing.Size(120, 28);
+            valLabel.TextAlign = System.Drawing.ContentAlignment.BottomLeft;
+            valLabel.Anchor = System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
+
+            var lblCardTitle = new System.Windows.Forms.Label();
+            lblCardTitle.Text = title;
+            lblCardTitle.BackColor = System.Drawing.Color.Transparent;
+            lblCardTitle.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Regular);
+            lblCardTitle.ForeColor = System.Drawing.Color.FromArgb(100, 116, 139); // slate-500
+            lblCardTitle.Location = new System.Drawing.Point(76, 44);
+            lblCardTitle.Size = new System.Drawing.Size(120, 18);
+            lblCardTitle.TextAlign = System.Drawing.ContentAlignment.TopLeft;
+            lblCardTitle.Anchor = System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
+
+            pnl.Controls.Add(lblIcon);
+            pnl.Controls.Add(valLabel);
+            pnl.Controls.Add(lblCardTitle);
+
+            return pnl;
         }
     }
 }

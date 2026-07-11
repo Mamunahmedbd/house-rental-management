@@ -36,6 +36,7 @@ namespace Housing_rental.Forms.Dashboard
             btnUsers.Visible = CurrentSession.IsAdmin;
             btnSettings.Visible = true;
 
+            lblWelcomeTitle.Text = "Welcome back, " + CurrentSession.User.FullName + "! 👋";
             SetActiveButton(btnDashboard);
             ShowDashboard();
             LoadDashboardSummary();
@@ -123,8 +124,10 @@ namespace Housing_rental.Forms.Dashboard
         {
             pnlContent.Controls.Clear();
             pnlContent.Controls.Add(lblStatus);
+            pnlContent.Controls.Add(pnlWelcomeBanner);
             pnlContent.Controls.Add(dashboardGrid);
             dashboardGrid.Visible = true;
+            pnlWelcomeBanner.Visible = true;
             lblStatus.Visible = true;
             lblTitle.Text = "Dashboard";
             btnRefresh.Enabled = true;
@@ -146,23 +149,86 @@ namespace Housing_rental.Forms.Dashboard
             if (!result.IsSuccess)
             {
                 lblStatus.Text = result.Message;
-                lblStatus.ForeColor = Color.Firebrick;
+                lblStatus.ForeColor = Color.FromArgb(220, 38, 38); // slate-red/rose-600
                 return;
             }
 
             DashboardSummary summary = result.Data;
             string currency = new RentPaymentService().GetDefaultCurrency();
-            lblTotalProperties.Text = summary.TotalProperties + "\nTotal Properties";
-            lblTotalRooms.Text = summary.TotalRooms + "\nTotal Rooms";
-            lblAvailableRooms.Text = summary.AvailableRooms + "\nAvailable Rooms";
-            lblOccupiedRooms.Text = summary.OccupiedRooms + "\nOccupied Rooms";
-            lblTotalTenants.Text = summary.TotalTenants + "\nTotal Tenants";
-            lblActiveAgreements.Text = summary.ActiveAgreements + "\nActive Agreements";
-            lblMonthlyCollected.Text = currency + " " + summary.MonthlyCollectedRent.ToString("N2") + "\nMonthly Collected";
-            lblMonthlyDue.Text = currency + " " + summary.MonthlyDueRent.ToString("N2") + "\nMonthly Due";
+            lblTotalProperties.Text = summary.TotalProperties.ToString();
+            lblTotalRooms.Text = summary.TotalRooms.ToString();
+            lblAvailableRooms.Text = summary.AvailableRooms.ToString();
+            lblOccupiedRooms.Text = summary.OccupiedRooms.ToString();
+            lblTotalTenants.Text = summary.TotalTenants.ToString();
+            lblActiveAgreements.Text = summary.ActiveAgreements.ToString();
+            lblMonthlyCollected.Text = currency + " " + summary.MonthlyCollectedRent.ToString("N2");
+            lblMonthlyDue.Text = currency + " " + summary.MonthlyDueRent.ToString("N2");
 
             lblStatus.Text = "Dashboard loaded successfully.";
-            lblStatus.ForeColor = Color.ForestGreen;
+            lblStatus.ForeColor = Color.FromArgb(22, 163, 74); // slate-green-600
+        }
+
+        private void WelcomeBanner_Paint(object sender, PaintEventArgs e)
+        {
+            Panel pnl = sender as Panel;
+            if (pnl == null) return;
+
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            using (var brush = new System.Drawing.Drawing2D.LinearGradientBrush(
+                pnl.ClientRectangle,
+                Color.FromArgb(37, 99, 235), // Blue-600
+                Color.FromArgb(29, 78, 216), // Blue-700
+                45F))
+            {
+                e.Graphics.FillRectangle(brush, pnl.ClientRectangle);
+            }
+        }
+
+        private void HeaderPanel_Paint(object sender, PaintEventArgs e)
+        {
+            Panel pnl = sender as Panel;
+            if (pnl == null) return;
+
+            using (Pen pen = new Pen(Color.FromArgb(226, 232, 240), 1))
+            {
+                e.Graphics.DrawLine(pen, 0, pnl.Height - 1, pnl.Width, pnl.Height - 1);
+            }
+        }
+
+        private void CardPanel_Paint(object sender, PaintEventArgs e)
+        {
+            Panel pnl = sender as Panel;
+            if (pnl == null) return;
+
+            using (Pen pen = new Pen(Color.FromArgb(226, 232, 240), 1))
+            {
+                e.Graphics.DrawRectangle(pen, 0, 0, pnl.Width - 1, pnl.Height - 1);
+            }
+        }
+
+        private void CardIcon_Paint(object sender, PaintEventArgs e)
+        {
+            Label lbl = sender as Label;
+            if (lbl == null) return;
+
+            Color bg = (lbl.Tag is Color) ? (Color)lbl.Tag : Color.LightGray;
+
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+
+            using (SolidBrush brush = new SolidBrush(bg))
+            {
+                e.Graphics.FillEllipse(brush, 0, 0, lbl.Width - 1, lbl.Height - 1);
+            }
+
+            using (Font font = new Font("Segoe MDL2 Assets", 18F, FontStyle.Regular))
+            using (SolidBrush brush = new SolidBrush(lbl.ForeColor))
+            {
+                SizeF size = e.Graphics.MeasureString(lbl.Text, font);
+                float x = (lbl.Width - size.Width) / 2f;
+                float y = (lbl.Height - size.Height) / 2f;
+                e.Graphics.DrawString(lbl.Text, font, brush, x, y);
+            }
         }
 
         private void OnLogoutRequested()
