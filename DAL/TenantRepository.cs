@@ -300,18 +300,15 @@ ORDER BY a.StartDate DESC;";
         {
             const string sql = @"
 SELECT
-    t.TenantId,
-    t.FullName,
-    ISNULL(SUM(rp.DueAmount), 0) AS TotalDue,
-    ISNULL(SUM(rp.PaidAmount), 0) AS TotalPaid,
-    ISNULL(SUM(rp.BalanceAmount), 0) AS TotalBalance,
-    COUNT(rp.PaymentId) AS PaymentCount,
-    SUM(CASE WHEN rp.Status = 'Overdue' THEN 1 ELSE 0 END) AS OverdueCount
-FROM dbo.Tenants t
-LEFT JOIN dbo.RentalAgreements a ON a.TenantId = t.TenantId
-LEFT JOIN dbo.RentPayments rp ON rp.AgreementId = a.AgreementId
-WHERE t.TenantId = @TenantId
-GROUP BY t.TenantId, t.FullName;";
+    tr.TenantId,
+    tr.FullName,
+    tr.TotalDue,
+    tr.TotalPaid,
+    tr.TotalBalance,
+    tr.PaymentCount,
+    tr.OverdueCount
+FROM dbo.vw_TenantReceivables tr
+WHERE tr.TenantId = @TenantId;";
 
             return SqlHelper.ExecuteDataTable(sql, SqlHelper.Parameter("@TenantId", tenantId));
         }
@@ -332,16 +329,15 @@ SELECT
     p.PropertyName,
     h.HouseName,
     r.RoomNo,
-    ISNULL(SUM(rp.DueAmount), 0) AS TotalDue,
-    ISNULL(SUM(rp.PaidAmount), 0) AS TotalPaid,
-    ISNULL(SUM(rp.BalanceAmount), 0) AS TotalBalance
+    tr.TotalDue,
+    tr.TotalPaid,
+    tr.TotalBalance
 FROM dbo.Tenants t
 LEFT JOIN dbo.RentalAgreements a ON a.TenantId = t.TenantId AND a.Status = 'Active'
 LEFT JOIN dbo.Rooms r ON r.RoomId = a.RoomId
 LEFT JOIN dbo.Houses h ON h.HouseId = r.HouseId
 LEFT JOIN dbo.Properties p ON p.PropertyId = h.PropertyId
-LEFT JOIN dbo.RentalAgreements allAgreements ON allAgreements.TenantId = t.TenantId
-LEFT JOIN dbo.RentPayments rp ON rp.AgreementId = allAgreements.AgreementId
+INNER JOIN dbo.vw_TenantReceivables tr ON tr.TenantId = t.TenantId
 WHERE
     (@Status = '' OR t.Status = @Status)
     AND
@@ -366,7 +362,10 @@ GROUP BY
     a.EndDate,
     p.PropertyName,
     h.HouseName,
-    r.RoomNo
+    r.RoomNo,
+    tr.TotalDue,
+    tr.TotalPaid,
+    tr.TotalBalance
 ORDER BY
     CASE t.Status
         WHEN 'Active' THEN 1

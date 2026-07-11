@@ -33,17 +33,17 @@ SELECT
     a.Status AS AgreementStatus,
     a.CreatedAt,
     u.FullName AS CreatedByName,
-    ISNULL(SUM(rp.DueAmount), 0) AS TotalDue,
-    ISNULL(SUM(rp.PaidAmount), 0) AS TotalPaid,
-    ISNULL(SUM(rp.BalanceAmount), 0) AS TotalBalance,
-    COUNT(rp.PaymentId) AS PaymentCount
+    ar.TotalDue,
+    ar.TotalPaid,
+    ar.TotalBalance,
+    ar.PaymentCount
 FROM dbo.RentalAgreements a
 INNER JOIN dbo.Tenants t ON t.TenantId = a.TenantId
 INNER JOIN dbo.Rooms r ON r.RoomId = a.RoomId
 INNER JOIN dbo.Houses h ON h.HouseId = r.HouseId
 INNER JOIN dbo.Properties p ON p.PropertyId = h.PropertyId
 INNER JOIN dbo.Users u ON u.UserId = a.CreatedByUserId
-LEFT JOIN dbo.RentPayments rp ON rp.AgreementId = a.AgreementId
+INNER JOIN dbo.vw_AgreementReceivables ar ON ar.AgreementId = a.AgreementId
 WHERE
     (@Status = '' OR a.Status = @Status)
     AND (@PropertyId IS NULL OR p.PropertyId = @PropertyId)
@@ -81,7 +81,11 @@ GROUP BY
     a.SecurityDeposit,
     a.Status,
     a.CreatedAt,
-    u.FullName
+    u.FullName,
+    ar.TotalDue,
+    ar.TotalPaid,
+    ar.TotalBalance,
+    ar.PaymentCount
 ORDER BY
     CASE a.Status
         WHEN 'Active' THEN 1
@@ -213,17 +217,17 @@ SELECT
     a.Notes,
     u.FullName AS CreatedByName,
     a.CreatedAt,
-    ISNULL(SUM(rp.DueAmount), 0) AS TotalDue,
-    ISNULL(SUM(rp.PaidAmount), 0) AS TotalPaid,
-    ISNULL(SUM(rp.BalanceAmount), 0) AS TotalBalance,
-    COUNT(rp.PaymentId) AS PaymentCount
+    ar.TotalDue,
+    ar.TotalPaid,
+    ar.TotalBalance,
+    ar.PaymentCount
 FROM dbo.RentalAgreements a
 INNER JOIN dbo.Tenants t ON t.TenantId = a.TenantId
 INNER JOIN dbo.Rooms r ON r.RoomId = a.RoomId
 INNER JOIN dbo.Houses h ON h.HouseId = r.HouseId
 INNER JOIN dbo.Properties p ON p.PropertyId = h.PropertyId
 INNER JOIN dbo.Users u ON u.UserId = a.CreatedByUserId
-LEFT JOIN dbo.RentPayments rp ON rp.AgreementId = a.AgreementId
+INNER JOIN dbo.vw_AgreementReceivables ar ON ar.AgreementId = a.AgreementId
 WHERE a.AgreementId = @AgreementId
 GROUP BY
     a.AgreementId,
@@ -243,7 +247,11 @@ GROUP BY
     a.Status,
     a.Notes,
     u.FullName,
-    a.CreatedAt;";
+    a.CreatedAt,
+    ar.TotalDue,
+    ar.TotalPaid,
+    ar.TotalBalance,
+    ar.PaymentCount;";
 
             return SqlHelper.ExecuteDataTable(sql, SqlHelper.Parameter("@AgreementId", agreementId));
         }
@@ -252,18 +260,21 @@ GROUP BY
         {
             const string sql = @"
 SELECT
-    ReceiptNo,
-    PaymentMonth,
-    PaymentYear,
-    DueAmount,
-    PaidAmount,
-    BalanceAmount,
-    PaymentDate,
-    PaymentMethod,
-    Status
-FROM dbo.RentPayments
-WHERE AgreementId = @AgreementId
-ORDER BY PaymentYear DESC, PaymentMonth DESC, PaymentDate DESC;";
+    ph.PaymentId,
+    ph.ReceiptNo,
+    MONTH(ad.BillingPeriod) AS PaymentMonth,
+    YEAR(ad.BillingPeriod) AS PaymentYear,
+    ad.ChargeAmount AS DueAmount,
+    ad.AllocatedAmount AS PaidAmount,
+    cb.BalanceAmount,
+    ph.PaymentDate,
+    ph.PaymentMethod,
+    ph.Status
+FROM dbo.vw_PaymentHistory ph
+INNER JOIN dbo.vw_PaymentAllocationDetails ad ON ad.PaymentId = ph.PaymentId
+INNER JOIN dbo.vw_RentChargeBalances cb ON cb.ChargeId = ad.ChargeId
+WHERE ph.AgreementId = @AgreementId
+ORDER BY ph.PaymentDate DESC, ph.PaymentId DESC, ad.BillingPeriod DESC;";
 
             return SqlHelper.ExecuteDataTable(sql, SqlHelper.Parameter("@AgreementId", agreementId));
         }
@@ -272,17 +283,15 @@ ORDER BY PaymentYear DESC, PaymentMonth DESC, PaymentDate DESC;";
         {
             const string sql = @"
 SELECT
-    a.AgreementId,
-    a.AgreementNo,
-    ISNULL(SUM(rp.DueAmount), 0) AS TotalDue,
-    ISNULL(SUM(rp.PaidAmount), 0) AS TotalPaid,
-    ISNULL(SUM(rp.BalanceAmount), 0) AS TotalBalance,
-    COUNT(rp.PaymentId) AS PaymentCount,
-    SUM(CASE WHEN rp.Status = 'Overdue' THEN 1 ELSE 0 END) AS OverdueCount
-FROM dbo.RentalAgreements a
-LEFT JOIN dbo.RentPayments rp ON rp.AgreementId = a.AgreementId
-WHERE a.AgreementId = @AgreementId
-GROUP BY a.AgreementId, a.AgreementNo;";
+    ar.AgreementId,
+    ar.AgreementNo,
+    ar.TotalDue,
+    ar.TotalPaid,
+    ar.TotalBalance,
+    ar.PaymentCount,
+    ar.OverdueCount
+FROM dbo.vw_AgreementReceivables ar
+WHERE ar.AgreementId = @AgreementId;";
 
             return SqlHelper.ExecuteDataTable(sql, SqlHelper.Parameter("@AgreementId", agreementId));
         }
@@ -413,7 +422,7 @@ WHERE
 
         public bool AgreementHasPayments(int agreementId)
         {
-            const string sql = "SELECT COUNT(1) FROM dbo.RentPayments WHERE AgreementId = @AgreementId;";
+            const string sql = "SELECT COUNT(1) FROM dbo.Payments WHERE AgreementId = @AgreementId;";
             return Exists(sql, SqlHelper.Parameter("@AgreementId", agreementId));
         }
 

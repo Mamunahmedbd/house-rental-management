@@ -321,14 +321,14 @@ namespace Housing_rental.Forms.Tenants
             surface.Padding = new Padding(0);
             dgvPayments = CreateGrid(_paymentHistoryBindingSource);
             AddGridColumn(dgvPayments, "ReceiptNo", "Receipt", 14);
-            AddGridColumn(dgvPayments, "PaymentMonth", "Month", 8);
-            AddGridColumn(dgvPayments, "PaymentYear", "Year", 8);
-            AddGridColumn(dgvPayments, "DueAmount", "Due", 12);
+            AddGridColumn(dgvPayments, "AgreementNo", "Agreement", 12);
+            AddGridColumn(dgvPayments, "PaymentDate", "Date", 11);
             AddGridColumn(dgvPayments, "PaidAmount", "Paid", 12);
-            AddGridColumn(dgvPayments, "BalanceAmount", "Balance", 12);
-            AddGridColumn(dgvPayments, "PaymentDate", "Date", 12);
+            AddGridColumn(dgvPayments, "CurrencyCode", "Currency", 8);
             AddGridColumn(dgvPayments, "PaymentMethod", "Method", 14);
-            AddGridColumn(dgvPayments, "Status", "Status", 12);
+            AddGridColumn(dgvPayments, "ExternalReference", "Reference", 14);
+            AddGridColumn(dgvPayments, "CollectedByName", "Collector", 13);
+            AddGridColumn(dgvPayments, "Status", "Status", 10);
             surface.Controls.Add(dgvPayments);
             tabPayments.Controls.Add(surface);
         }

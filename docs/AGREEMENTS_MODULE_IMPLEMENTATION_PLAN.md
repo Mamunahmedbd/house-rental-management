@@ -1,296 +1,330 @@
-# Agreements Module Implementation Plan
+# Agreements Module — Industrial Implementation Plan
 
-## Document Control
+## Document control
 
-| Item | Details |
+| Item | Value |
 | --- | --- |
 | Project | House Rental Management System |
 | Module | Rental Agreements |
-| Application Type | C# Windows Forms Desktop Application |
-| Framework | .NET Framework 4.7.2 |
-| Architecture | Single-project 3-layer architecture |
+| Document type | Architecture-aligned implementation and hardening plan |
+| Baseline reviewed | Git commit `718f169` (`feat: implement agreements module...`) |
+| Review date | 2026-07-11 |
+| Application | C# Windows Forms, .NET Framework 4.7.2 |
+| Architecture | Single-project, three-layer architecture: UI → BLL → DAL → SQL Server |
 | Database | SQL Server Express, `HouseRentalDB` |
-| Data Access | ADO.NET with parameterized SQL |
-| Target Location | `Forms/Agreements`, `BLL/AgreementService.cs`, `DAL/AgreementRepository.cs`, `Models/RentalAgreement.cs`, `Database` |
-| Related Modules | Properties, Houses, Rooms, Tenants, Rent Payments, Dashboard, Reports, Audit Logs |
+| Primary owners | Application developer, database developer, QA/reviewer |
+| Status | Ready for implementation |
 
-## 1. Purpose
+## 1. Executive summary
 
-The Agreements module will manage the contract lifecycle between active tenants and available rooms. It is the central workflow that connects tenant records, rental inventory, room occupancy, rent payment generation, dashboard metrics, and reporting.
+The Agreements module is already implemented as a functional vertical slice. It has a WinForms management control, a business service, a repository, a SQL table and views, dashboard navigation, audit calls, and transactional room-occupancy changes for most lifecycle operations.
 
-The module must support:
+The correct next step is therefore not a greenfield build. It is a controlled hardening and completion program that preserves the current three-layer structure while addressing production-critical gaps:
 
-- Creating draft and active rental agreements.
-- Selecting only eligible tenants and available rooms.
-- Assigning rent, deposit, start date, end date, and notes.
-- Activating agreements with transactional room status updates.
-- Renewing, expiring, terminating, and cancelling agreements safely.
-- Viewing agreement history with tenant, room, property, and payment context.
-- Preparing agreement data for reports and rent collection workflows.
+1. Make create-and-activate, renewal, expiry, cancellation, and room occupancy fully atomic and concurrency-safe.
+2. define lifecycle semantics for current, scheduled, expired, terminated, cancelled, and renewed agreements;
+3. move critical invariants into the database as well as the BLL;
+4. preserve traceable agreement history, reasons, actors, and timestamps;
+5. add authorization at the service boundary;
+6. replace destructive database recreation with forward-only migrations;
+7. prepare a stable contract for Rent Collection, Reports, Dashboard, Tenants, and Properties;
+8. add repeatable automated and manual verification.
 
-This implementation should follow the current project style: dashboard-loaded Windows Forms `UserControl`, business rules in `BLL`, SQL Server access in `DAL`, models in `Models`, and database integrity in SQL scripts.
+This plan deliberately separates mandatory correctness work from optional enterprise enhancements so the project can remain appropriate for its current size.
 
-## 2. Current Project Analysis
+## 2. Evidence and analysis scope
 
-### 2.1 Existing Project Structure
+### 2.1 Source areas reviewed
 
-The project already uses a clean single-project 3-layer structure:
+The plan is based on direct review of:
+
+- project and runtime configuration: `Housing rental.csproj`, `Program.cs`, `ApplicationSessionContext.cs`, `App.config`;
+- agreement implementation: `Models/RentalAgreement.cs`, `BLL/AgreementService.cs`, `DAL/AgreementRepository.cs`, and `Forms/Agreements/*`;
+- related modules: Properties, Houses, Rooms, Tenants, Rent Payments, Dashboard, Users, Roles, Audit Logs, and shared `ServiceResult`/SQL helpers;
+- database scripts: table creation, indexes, views, stored procedures, and seed data;
+- existing project and module planning documents;
+- the current Git history and a clean MSBuild compilation.
+
+### 2.2 Verification result
+
+| Check | Result |
+| --- | --- |
+| Working tree before documentation change | Clean |
+| .NET Framework build | Passed with MSBuild 18.7.8 |
+| Agreement UI wired into Dashboard | Yes |
+| Agreement DAL/BLL compiled | Yes |
+| Database design reviewed from scripts | Yes |
+| Live database inspected | No — local SQL authentication failed with an SSPI context error |
+
+The SQL analysis in this plan is therefore authoritative for the version-controlled schema, but row counts, data quality, drift, and deployed object versions must be checked in the target SQL Server during Phase 0.
+
+## 3. Current architecture and module map
+
+### 3.1 Repository structure relevant to Agreements
 
 ```text
 housing_rental/
-|-- App.config
-|-- ApplicationSessionContext.cs
-|-- Program.cs
-|-- Housing rental.csproj
-|-- Assets/
-|-- BLL/
-|-- DAL/
-|-- Database/
-|-- Forms/
-|-- Models/
-|-- Properties/
-|-- Reports/
-|-- docs/
+├── App.config
+├── ApplicationSessionContext.cs
+├── Program.cs
+├── Housing rental.csproj
+├── Models/
+│   ├── RentalAgreement.cs
+│   ├── RentPayment.cs
+│   ├── Tenant.cs
+│   ├── Room.cs
+│   ├── House.cs
+│   ├── Property.cs
+│   ├── User.cs
+│   └── ServiceResult.cs
+├── BLL/
+│   ├── AgreementService.cs
+│   ├── RentPaymentService.cs
+│   ├── TenantService.cs
+│   ├── PropertyService.cs
+│   ├── DashboardService.cs
+│   └── CurrentSession.cs
+├── DAL/
+│   ├── AgreementRepository.cs
+│   ├── TenantRepository.cs
+│   ├── PropertyRepository.cs
+│   ├── DashboardRepository.cs
+│   ├── AuditRepository.cs
+│   ├── DbConnectionFactory.cs
+│   └── SqlHelper.cs
+├── Forms/
+│   ├── Agreements/
+│   │   ├── AgreementManagementControl.cs
+│   │   └── AgreementManagementControl.Designer.cs
+│   └── Dashboard/FrmDashboard.cs
+├── Database/
+│   ├── 01_CreateDatabase.sql
+│   ├── 02_CreateTables.sql
+│   ├── 03_CreateViews.sql
+│   ├── 04_CreateStoredProcedures.sql
+│   └── 05_SeedData.sql
+└── docs/
 ```
 
-| Layer | Existing Folder | Current Role |
+### 3.2 Runtime dependency flow
+
+```mermaid
+flowchart LR
+    U["Admin or Staff"] --> UI["AgreementManagementControl"]
+    UI --> S["AgreementService"]
+    S --> AR["AgreementRepository"]
+    S --> TS["TenantService"]
+    S --> PS["PropertyService"]
+    S --> AU["AuditRepository"]
+    AR --> DB[("HouseRentalDB")]
+    TS --> DB
+    PS --> DB
+    AU --> DB
+    DB --> D["Dashboard"]
+    DB --> P["Rent Collection"]
+    DB --> R["Reports"]
+```
+
+The existing direction is appropriate. UI code must continue to call services only; services own workflow rules; repositories own SQL and transactions; SQL Server owns persistence constraints.
+
+### 3.3 Current implementation inventory
+
+| Area | Current state | Decision |
 | --- | --- | --- |
-| UI | `Forms` | Login, dashboard, admin, property management, tenant management, placeholders |
-| BLL | `BLL` | Authentication, users, dashboard, property workflows, tenant workflows, agreement/payment validation |
-| DAL | `DAL` | SQL Server repositories, shared helpers, audit logging |
-| Models | `Models` | Entity classes and `ServiceResult` wrappers |
-| Database | `Database` | Tables, indexes, views, stored procedures, seed data |
-| Docs | `docs` | Architecture and module implementation plans |
+| `RentalAgreement` entity | Core table fields only | Extend with lifecycle/audit fields or introduce read DTOs |
+| Agreements UI | Implemented, single large UserControl with list, editor, details, payments, expiry | Retain behavior; refactor responsibilities incrementally |
+| Agreement service | Implemented with validation and lifecycle methods | Retain public façade; harden authorization, errors, and transactional boundaries |
+| Agreement repository | Implemented with queries and transactions | Refactor atomic workflows and typed parameters |
+| Agreement table | Core fields, foreign keys, status/date/rent checks | Migrate forward with lifecycle and concurrency columns |
+| Active room uniqueness | Enforced by filtered unique index | Retain |
+| Active tenant uniqueness | Enforced only by BLL | Decide policy and, if one tenancy is required, add filtered unique index |
+| Agreement number | Generated by `MAX(...) + 1` | Replace; current approach races under concurrency |
+| Create and activate | Two separate repository calls | Replace with one transaction |
+| Renewal | Transactional, but immediately expires source and activates successor | Redesign around scheduled renewal/effective dates |
+| Room synchronization | Updated during activation/end | Retain but strengthen as a derived invariant |
+| Audit | Best-effort, outside lifecycle transaction | Keep operational audit; add durable lifecycle fields/events |
+| Authorization | No Agreement-specific service checks | Add service-boundary permission checks |
+| Payments integration | Read-only history; payment service is validation-only | Define stable Agreement contract; implement payment module separately |
+| Automated tests | No test project | Add focused tests before behavior changes |
+| Database deployment | Destructive table recreation scripts | Keep bootstrap scripts; add numbered, idempotent migrations |
 
-### 2.2 Existing Agreement-Related Files
+## 4. Domain model and relationships
 
-| File | Current Status | Agreement Relevance |
-| --- | --- | --- |
-| `Models/RentalAgreement.cs` | Exists | Contains the agreement entity fields matching `RentalAgreements` |
-| `BLL/AgreementService.cs` | Partial | Currently performs basic validation only |
-| `DAL/AgreementRepository.cs` | Missing | Required for CRUD, lifecycle transitions, lookups, and joined grids |
-| `Forms/Agreements/*` | Missing | Required for the dashboard Agreements screen |
-| `Forms/Dashboard/FrmDashboard.cs` | Partial | Agreements button currently opens `ModulePlaceholderControl` |
-| `Database/02_CreateTables.sql` | Exists | Defines `RentalAgreements`, relationships, constraints, and active-room uniqueness |
-| `Database/03_CreateViews.sql` | Exists | Defines `vw_ActiveAgreements` and agreement data in `vw_RoomOccupancy` |
-| `Database/04_CreateStoredProcedures.sql` | Partial | Dashboard and payment reports depend on agreements |
-| `BLL/PropertyService.cs` | Implemented | Provides `GetAvailableRooms()` and room status protection |
-| `BLL/TenantService.cs` | Implemented | Provides `GetActiveTenants()` and agreement/payment history support |
-| `DAL/AuditRepository.cs` | Implemented | Should log agreement create, update, activation, renewal, termination, and cancellation |
-
-### 2.3 Current Implementation Status
-
-| Area | Current Status |
-| --- | --- |
-| Agreement model | Implemented |
-| Agreement table | Implemented |
-| Agreement status constraint | Implemented |
-| Agreement date and rent constraints | Implemented |
-| Unique active agreement per room | Implemented through filtered unique index |
-| Agreement BLL validation | Minimal |
-| Agreement repository | Not implemented |
-| Agreement UI | Not implemented |
-| Dashboard navigation | Placeholder only |
-| Tenant selection source | Available through `TenantService.GetActiveTenants()` |
-| Room selection source | Available through `PropertyService.GetAvailableRooms()` |
-| Payment integration | Planned, `RentPaymentService` currently validation-only |
-| Audit integration | Available, not wired to agreements |
-
-### 2.4 Architecture Pattern To Follow
-
-Existing implemented modules use this pattern:
-
-```text
-FrmDashboard
-    |
-    v
-PropertyManagementControl / TenantManagementControl
-    |
-    v
-PropertyService / TenantService
-    |
-    v
-PropertyRepository / TenantRepository
-    |
-    v
-SQL Server
-```
-
-The Agreements module should follow the same shape:
-
-```text
-FrmDashboard
-    |
-    v
-AgreementManagementControl
-    |
-    v
-AgreementService
-    |
-    v
-AgreementRepository
-    |
-    v
-SQL Server: RentalAgreements, Tenants, Rooms, Houses, Properties, RentPayments, AuditLogs
-```
-
-## 3. Domain and Relationship Analysis
-
-### 3.1 Core Relationship
+### 4.1 Physical relationships
 
 ```mermaid
 erDiagram
-    Tenants ||--o{ RentalAgreements : signs
-    Rooms ||--o{ RentalAgreements : assigned_to
-    Houses ||--o{ Rooms : contains
-    Properties ||--o{ Houses : contains
-    RentalAgreements ||--o{ RentPayments : generates
+    Roles ||--o{ Users : grants
     Users ||--o{ RentalAgreements : creates
     Users ||--o{ RentPayments : collects
-    Users ||--o{ AuditLogs : creates
+    Users ||--o{ AuditLogs : performs
+    Properties ||--o{ Houses : contains
+    Houses ||--o{ Rooms : contains
+    Rooms ||--o{ RentalAgreements : allocated_by
+    Tenants ||--o{ RentalAgreements : signs
+    RentalAgreements ||--o{ RentPayments : billed_through
+    Properties ||--o{ MaintenanceRequests : receives
+    Rooms ||--o{ MaintenanceRequests : affects
 ```
 
-### 3.2 Agreement-Centered Data Flow
+### 4.2 Agreement as the operational aggregate
 
-```text
-RentalAgreement
-  -> Tenant
-  -> Room
-      -> House
-          -> Property
-  -> RentPayments
-  -> CreatedBy User
-  -> AuditLogs
+An agreement connects four independently managed concerns:
+
+| Concern | Source of truth | Agreement dependency |
+| --- | --- | --- |
+| Tenant eligibility | `Tenants.Status` | Only an eligible tenant may activate |
+| Inventory eligibility | Property/House active flags and `Rooms.Status` | Only an operational, available room may activate |
+| Contract terms | `RentalAgreements` | Dates and financial terms must be immutable after activation except through explicit correction |
+| Financial history | `RentPayments` | Payments must retain their agreement reference permanently |
+| User accountability | `Users`, `AuditLogs` | Every material transition needs actor and time |
+| Dashboard/reporting | views and stored procedures | Counts must use effective lifecycle rules, not status alone |
+
+### 4.3 Data ownership rules
+
+- Agreements reference tenants and rooms; they do not copy tenant contact or room hierarchy data as the primary source.
+- Contractual rent and deposit are snapshots stored on the agreement. Later room-price changes must not change an existing contract.
+- A payment belongs to exactly one agreement and must never be reassigned after posting.
+- Agreement records are never physically deleted through normal application workflows.
+- Room `Status` is an operational cache/invariant. Agreement activation and closure must update it in the same transaction.
+- Historical contract facts must remain reportable after tenant, property, house, room, or user records become inactive.
+
+## 5. Target lifecycle model
+
+### 5.1 Status definitions
+
+| Status | Meaning | Contract fields editable? | Room impact | Allowed next states |
+| --- | --- | --- | --- | --- |
+| Draft | In preparation; not legally/operationally active | Yes | None | Active, Cancelled |
+| Active | Current effective contract | Notes only; corrections via controlled command | Occupied | Expired, Terminated |
+| Expired | Completed normally at end date | No | Release if no active successor | None |
+| Terminated | Ended early by authorized user | No | Release | None |
+| Cancelled | Draft or eligible future contract voided | No | None/release if reserved later | None |
+
+### 5.2 State machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> Draft
+    Draft --> Active: activate after eligibility check
+    Draft --> Cancelled: cancel
+    Active --> Expired: end date passed / renewal handover
+    Active --> Terminated: authorized early termination
+    Active --> Cancelled: only if future, unpaid, and policy permits
+    Expired --> [*]
+    Terminated --> [*]
+    Cancelled --> [*]
 ```
 
-The agreement screen should not show agreement fields only. It should give operational context:
+### 5.3 Mandatory transition invariants
 
-- Tenant name, phone, status, and identity reference.
-- Property, house, room, room type, and current room status.
-- Agreement status, date range, rent, deposit, and notes.
-- Payment summary for the agreement.
-- Payment history if rent records already exist.
-- Renewal and termination history.
+Activation must atomically:
 
-### 3.3 Existing Model
+1. lock and reload the agreement, tenant, room, house, and property;
+2. confirm the agreement is Draft;
+3. confirm tenant is Active;
+4. confirm property and house are active;
+5. confirm room is Available and has no active agreement;
+6. confirm the tenant policy (single active agreement or explicitly allowed multiple tenancy);
+7. set agreement to Active with `ActivatedAt`/`ActivatedByUserId`;
+8. set the room to Occupied;
+9. commit once.
 
-```csharp
-public class RentalAgreement
-{
-    public int AgreementId { get; set; }
-    public string AgreementNo { get; set; }
-    public int TenantId { get; set; }
-    public int RoomId { get; set; }
-    public DateTime StartDate { get; set; }
-    public DateTime EndDate { get; set; }
-    public decimal MonthlyRent { get; set; }
-    public decimal SecurityDeposit { get; set; }
-    public string Status { get; set; }
-    public string Notes { get; set; }
-    public int CreatedByUserId { get; set; }
-    public DateTime CreatedAt { get; set; }
-}
-```
+Termination/expiry must atomically update the agreement, store reason/actor/time, and release the room only when no other effective active agreement uses it.
 
-### 3.4 Agreement Statuses
+### 5.4 Renewal decision
 
-| Status | Meaning | Editable | Room Status Impact |
-| --- | --- | --- | --- |
-| Draft | Agreement is prepared but not active | Yes | Room remains `Available` |
-| Active | Agreement is currently valid | Limited | Room becomes `Occupied` |
-| Expired | Agreement ended because end date passed | No, except notes/admin correction | Room becomes `Available` if no other active agreement exists |
-| Terminated | Agreement ended manually before planned end date | No, except notes/admin correction | Room becomes `Available` if no other active agreement exists |
-| Cancelled | Draft or future agreement was cancelled | No | Room remains or becomes `Available` if no active agreement exists |
+The current implementation expires the source immediately and creates the successor as Active, even when the source end date is in the future. That distorts current-active queries and dashboard rent.
 
-### 3.5 Required Business Rules
+Adopt one of these designs before implementing Phase 3:
 
-- Tenant is required.
-- Tenant must exist and have `Status = 'Active'` when creating or activating an agreement.
-- Room is required.
-- Room must exist and have `Status = 'Available'` when creating an active agreement.
-- Draft agreements can be created for available rooms but must not mark the room occupied.
-- Start date must be before end date.
-- Monthly rent must be greater than zero.
-- Security deposit cannot be negative.
-- Agreement number must be unique.
-- A room cannot have more than one active agreement.
-- A tenant should normally have only one active agreement unless the final business rule explicitly allows multi-room tenancy.
-- Active agreements should not allow tenant, room, start date, or rent changes without a controlled correction workflow.
-- Terminating or expiring an agreement must release the room only when no active agreement remains for that room.
-- Cancellation should be allowed for `Draft` agreements and optionally future-dated `Active` agreements before payment records exist.
-- Agreements should not be physically deleted because payments, reports, and audit history depend on stable records.
+- **Recommended for this project:** create the successor as Draft with `RenewedFromAgreementId`, then activate it during a scheduled/manual handover after the source expires.
+- Enterprise alternative: add `Scheduled` status and calculate effective occupancy from status plus dates.
 
-## 4. Database Implementation Plan
+Do not keep two agreements marked Active for the same room, and do not expire the current agreement early merely to save a renewal.
 
-### 4.1 Existing Table
+## 6. Functional scope
 
-`Database/02_CreateTables.sql` already defines:
+### 6.1 In scope
 
-```sql
-CREATE TABLE dbo.RentalAgreements
-(
-    AgreementId INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_RentalAgreements PRIMARY KEY,
-    AgreementNo NVARCHAR(50) NOT NULL CONSTRAINT UQ_RentalAgreements_AgreementNo UNIQUE,
-    TenantId INT NOT NULL,
-    RoomId INT NOT NULL,
-    StartDate DATE NOT NULL,
-    EndDate DATE NOT NULL,
-    MonthlyRent DECIMAL(18,2) NOT NULL,
-    SecurityDeposit DECIMAL(18,2) NOT NULL CONSTRAINT DF_RentalAgreements_SecurityDeposit DEFAULT (0),
-    Status NVARCHAR(30) NOT NULL CONSTRAINT DF_RentalAgreements_Status DEFAULT ('Draft'),
-    Notes NVARCHAR(500) NULL,
-    CreatedByUserId INT NOT NULL,
-    CreatedAt DATETIME NOT NULL CONSTRAINT DF_RentalAgreements_CreatedAt DEFAULT (GETDATE()),
-    CONSTRAINT FK_RentalAgreements_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(TenantId),
-    CONSTRAINT FK_RentalAgreements_Rooms FOREIGN KEY (RoomId) REFERENCES dbo.Rooms(RoomId),
-    CONSTRAINT FK_RentalAgreements_Users FOREIGN KEY (CreatedByUserId) REFERENCES dbo.Users(UserId),
-    CONSTRAINT CK_RentalAgreements_Dates CHECK (EndDate > StartDate),
-    CONSTRAINT CK_RentalAgreements_MonthlyRent CHECK (MonthlyRent > 0),
-    CONSTRAINT CK_RentalAgreements_Status CHECK (Status IN ('Draft', 'Active', 'Expired', 'Terminated', 'Cancelled'))
-);
-```
+- Search/filter agreement directory by number, tenant, property, room, status, and date.
+- Create, edit, cancel, and activate drafts.
+- View immutable contract and hierarchy details.
+- Update non-contractual notes with audit.
+- Expire due agreements, terminate active agreements, and renew via controlled handover.
+- View agreement-specific payment history and balance summary.
+- Produce eligibility lookups for tenants and rooms.
+- Maintain room occupancy, dashboard metrics, auditability, and report-ready history.
+- Apply role-based authorization and concurrency control.
 
-Existing active-room protection:
+### 6.2 Out of scope for the Agreements delivery
 
-```sql
-CREATE UNIQUE INDEX UX_RentalAgreements_OneActiveRoom
-ON dbo.RentalAgreements(RoomId)
-WHERE Status = 'Active';
-```
+- Posting or reversing rent payments.
+- General ledger accounting.
+- E-signatures, scanned document storage, email/SMS delivery.
+- Legal jurisdiction templates.
+- Multi-property-group or multi-company tenancy.
+- Online tenant self-service.
 
-### 4.2 Existing Views
+These may consume Agreements data later but should not be embedded in `AgreementManagementControl`.
 
-The project already has:
+## 7. Business rules catalogue
 
-| View | Usage |
-| --- | --- |
-| `vw_ActiveAgreements` | Active agreement grid and report data |
-| `vw_RoomOccupancy` | Property/house/room occupancy visibility |
-| `vw_TenantBalances` | Tenant balance summaries when payments exist |
+| ID | Rule | Enforcement |
+| --- | --- | --- |
+| AGR-001 | Agreement number is required and unique | BLL + unique DB constraint |
+| AGR-002 | Tenant, room, start date, end date, rent, creator are required | BLL + DB |
+| AGR-003 | `EndDate > StartDate` | BLL + DB check |
+| AGR-004 | Monthly rent is greater than zero | BLL + DB check |
+| AGR-005 | Security deposit is zero or greater | BLL + new DB check |
+| AGR-006 | Status is a recognized lifecycle value | BLL + DB check |
+| AGR-007 | Only active tenants may activate an agreement | Transactional DAL check |
+| AGR-008 | Only active property/house and available room may activate | Transactional DAL check |
+| AGR-009 | A room has at most one Active agreement | BLL + filtered unique index |
+| AGR-010 | Tenant active-agreement cardinality follows one explicit policy | BLL + optional filtered unique index |
+| AGR-011 | Only Draft contract terms can be edited | BLL + conditional update |
+| AGR-012 | Active/closed agreements cannot be deleted | UI/BLL; no delete repository method |
+| AGR-013 | Active agreements with payments cannot be cancelled | BLL + transactional recheck |
+| AGR-014 | Normal expiry is allowed only after `EndDate` | BLL + transactional recheck |
+| AGR-015 | Termination requires a non-empty reason and authorization | BLL + DB lifecycle fields |
+| AGR-016 | Renewal preserves a link to its source agreement | DB self-FK + BLL |
+| AGR-017 | Every transition records actor and timestamp | DB columns/event record |
+| AGR-018 | Stale UI updates are rejected | `rowversion` optimistic concurrency |
+| AGR-019 | Contract dates use one documented inclusive/exclusive convention | BLL, reports, tests |
+| AGR-020 | Raw SQL exception text is not displayed to end users | BLL error mapping + diagnostic logging |
 
-`vw_ActiveAgreements` includes:
+## 8. Database implementation plan
 
-- Agreement ID and number.
-- Tenant name and phone.
-- Property, house, and room.
-- Start date, end date, rent, deposit, and status.
+### 8.1 Preserve existing strengths
 
-### 4.3 Recommended Database Improvements
+Retain:
 
-Add these indexes after checking existing data:
+- foreign keys from Agreements to Tenants, Rooms, and Users;
+- check constraints for date order, positive rent, and status values;
+- unique Agreement number;
+- filtered unique index `UX_RentalAgreements_OneActiveRoom`;
+- lookup indexes on status/end date, tenant/status, and room/status;
+- joined agreement directory concept;
+- payment history linked by `AgreementId`.
 
-```sql
-CREATE INDEX IX_RentalAgreements_Status_EndDate
-ON dbo.RentalAgreements(Status, EndDate);
+### 8.2 Required schema additions
 
-CREATE INDEX IX_RentalAgreements_TenantId_Status
-ON dbo.RentalAgreements(TenantId, Status);
+Add through a new migration, not by editing a deployed database manually:
 
-CREATE INDEX IX_RentalAgreements_RoomId_Status
-ON dbo.RentalAgreements(RoomId, Status);
-```
+| Column/constraint | Type | Purpose |
+| --- | --- | --- |
+| `ActivatedAt` | `DATETIME2(0) NULL` | Activation trace |
+| `ActivatedByUserId` | `INT NULL` FK Users | Activation actor |
+| `ClosedAt` | `DATETIME2(0) NULL` | Expiry/termination/cancellation time |
+| `ClosedByUserId` | `INT NULL` FK Users | Closing actor |
+| `ClosureReason` | `NVARCHAR(500) NULL` | Required for manual termination/cancellation |
+| `RenewedFromAgreementId` | `INT NULL` self-FK | Renewal chain |
+| `UpdatedAt` | `DATETIME2(0) NOT NULL` | Last material update |
+| `UpdatedByUserId` | `INT NULL` FK Users | Last editor |
+| `RowVersion` | `ROWVERSION NOT NULL` | Optimistic concurrency |
+| `CK_RentalAgreements_SecurityDeposit` | Check | `SecurityDeposit >= 0` |
 
-If the project rule is one active room per tenant, add:
+Optional if the business confirms one active agreement per tenant:
 
 ```sql
 CREATE UNIQUE INDEX UX_RentalAgreements_OneActiveTenant
@@ -298,1009 +332,588 @@ ON dbo.RentalAgreements(TenantId)
 WHERE Status = 'Active';
 ```
 
-Use this tenant uniqueness rule only if the final scope says one tenant cannot rent multiple rooms at the same time.
+Before adding it, run a duplicate-active-tenant data check and resolve conflicts.
 
-### 4.4 Recommended Agreement Directory View
+### 8.3 Agreement number generation
 
-Create an optional view for fast list screens and reports:
+Replace `MAX(RIGHT(AgreementNo, 4)) + 1`. Two simultaneous sessions can generate the same value.
 
-```sql
-CREATE OR ALTER VIEW dbo.vw_AgreementDirectory
-AS
-SELECT
-    a.AgreementId,
-    a.AgreementNo,
-    a.TenantId,
-    t.FullName AS TenantName,
-    t.Phone AS TenantPhone,
-    t.Status AS TenantStatus,
-    p.PropertyId,
-    p.PropertyName,
-    h.HouseId,
-    h.HouseName,
-    r.RoomId,
-    r.RoomNo,
-    r.RoomType,
-    r.Status AS RoomStatus,
-    a.StartDate,
-    a.EndDate,
-    a.MonthlyRent,
-    a.SecurityDeposit,
-    a.Status AS AgreementStatus,
-    a.CreatedByUserId,
-    u.FullName AS CreatedByName,
-    a.CreatedAt,
-    ISNULL(SUM(rp.DueAmount), 0) AS TotalDue,
-    ISNULL(SUM(rp.PaidAmount), 0) AS TotalPaid,
-    ISNULL(SUM(rp.BalanceAmount), 0) AS TotalBalance,
-    COUNT(rp.PaymentId) AS PaymentCount
-FROM dbo.RentalAgreements a
-INNER JOIN dbo.Tenants t ON t.TenantId = a.TenantId
-INNER JOIN dbo.Rooms r ON r.RoomId = a.RoomId
-INNER JOIN dbo.Houses h ON h.HouseId = r.HouseId
-INNER JOIN dbo.Properties p ON p.PropertyId = h.PropertyId
-INNER JOIN dbo.Users u ON u.UserId = a.CreatedByUserId
-LEFT JOIN dbo.RentPayments rp ON rp.AgreementId = a.AgreementId
-GROUP BY
-    a.AgreementId,
-    a.AgreementNo,
-    a.TenantId,
-    t.FullName,
-    t.Phone,
-    t.Status,
-    p.PropertyId,
-    p.PropertyName,
-    h.HouseId,
-    h.HouseName,
-    r.RoomId,
-    r.RoomNo,
-    r.RoomType,
-    r.Status,
-    a.StartDate,
-    a.EndDate,
-    a.MonthlyRent,
-    a.SecurityDeposit,
-    a.Status,
-    a.CreatedByUserId,
-    u.FullName,
-    a.CreatedAt;
-```
+Recommended implementation:
 
-### 4.5 Recommended Stored Procedures
+- create a SQL `SEQUENCE`, for example `dbo.AgreementNumberSequence`;
+- generate `AGR-yyyyMM-########` inside the same transaction that inserts the agreement;
+- retain the unique constraint as the final safeguard;
+- allow a caller-supplied number only for authorized migration/import cases.
 
-| Procedure | Purpose |
-| --- | --- |
-| `sp_GetAgreementDirectory` | Search agreements by text, status, tenant, property, room, and date range |
-| `sp_GetAgreementDetails` | Load one agreement with tenant, room, property, payment totals, and creator |
-| `sp_ExpireDueAgreements` | Mark active agreements expired when `EndDate < GETDATE()` and release rooms |
-| `sp_GetExpiringAgreements` | Return agreements ending within a configurable number of days |
+### 8.4 Migration layout
 
-For this project size, repository SQL methods are acceptable. Stored procedures are recommended for expiry automation and reports because they centralize cross-table changes.
-
-### 4.6 Physical Delete Policy
-
-Do not physically delete agreements from the UI.
-
-Use status transitions:
-
-| User Intent | Status |
-| --- | --- |
-| Not ready yet | `Draft` |
-| Contract started | `Active` |
-| Reached end date | `Expired` |
-| Ended early | `Terminated` |
-| Invalid or cancelled before use | `Cancelled` |
-
-This keeps payment, tenant, occupancy, dashboard, and audit history consistent.
-
-## 5. DAL Implementation Plan
-
-Create:
+Keep `01`–`05` as clean-install/bootstrap scripts, and add:
 
 ```text
-DAL/AgreementRepository.cs
+Database/Migrations/
+├── 20260711_001_AgreementLifecycleMetadata.sql
+├── 20260711_002_AgreementNumberSequence.sql
+├── 20260711_003_AgreementConcurrencyAndIndexes.sql
+└── 20260711_004_AgreementViewsAndProcedures.sql
 ```
 
-### 5.1 Repository Responsibilities
+Each migration must:
 
-The repository should:
+- be forward-only and idempotent where practical;
+- use `XACT_ABORT ON` and a transaction for related DDL/data backfill;
+- check existing data before adding constraints;
+- include validation queries and a documented rollback strategy;
+- avoid dropping tables or data;
+- record deployment in a `SchemaVersions` table.
 
-- Use `DbConnectionFactory.CreateConnection()`.
-- Use `SqlCommand`, `SqlDataReader`, `SqlDataAdapter`, and `DataTable`.
-- Use parameterized SQL only.
-- Return typed `RentalAgreement` objects for core agreement operations.
-- Return `DataTable` for joined grids, reports, and summaries.
-- Use explicit column lists.
-- Use `SqlTransaction` for lifecycle changes that update both `RentalAgreements` and `Rooms`.
-- Avoid UI decisions and business validation.
+### 8.5 Query/view changes
 
-### 5.2 Required Methods
+Update `vw_AgreementDirectory` to expose lifecycle fields and renewal source. Make dashboard and reports use a shared definition of an effective agreement.
 
-Agreement CRUD and lookup:
+Add or update procedures for:
 
-| Method | Purpose |
+| Procedure | Responsibility |
 | --- | --- |
-| `List<RentalAgreement> SearchAgreements(string searchText, string status, DateTime? fromDate, DateTime? toDate)` | Load simple typed list |
-| `DataTable GetAgreementDirectory(string searchText, string status, int? propertyId, int? tenantId, DateTime? fromDate, DateTime? toDate)` | Load joined grid |
-| `RentalAgreement GetAgreementById(int agreementId)` | Load one agreement for edit/lifecycle action |
-| `DataTable GetAgreementDetails(int agreementId)` | Load one agreement with tenant, room, property, and payment summary |
-| `bool AgreementNoExists(string agreementNo, int excludedAgreementId)` | Prevent duplicate agreement numbers |
-| `bool RoomHasActiveAgreement(int roomId, int excludedAgreementId)` | Validate active room uniqueness before save |
-| `bool TenantHasActiveAgreement(int tenantId, int excludedAgreementId)` | Optional one-active-agreement-per-tenant rule |
-| `int CreateAgreement(RentalAgreement agreement)` | Insert and return new ID |
-| `void UpdateDraftAgreement(RentalAgreement agreement)` | Update editable draft agreement fields |
-| `void UpdateAgreementNotes(int agreementId, string notes)` | Allow notes correction without changing core contract fields |
+| `sp_Agreement_CreateDraft` | Atomic number allocation and insert |
+| `sp_Agreement_Activate` | Locked eligibility recheck, state update, room update |
+| `sp_Agreement_Close` | Expire/terminate/cancel with actor/reason and room release |
+| `sp_Agreement_CreateRenewalDraft` | Linked successor draft without closing source early |
+| `sp_Agreement_HandoverRenewal` | Atomic source expiry and successor activation |
+| `sp_Agreement_ExpireDue` | Set-based expiry plus room reconciliation |
 
-Lifecycle methods:
+Stored procedures are recommended for multi-table state transitions. Read-only directory queries may remain in the repository or use views.
 
-| Method | Purpose |
-| --- | --- |
-| `void ActivateAgreement(int agreementId)` | Set agreement active and room occupied in one transaction |
-| `void TerminateAgreement(int agreementId)` | Set agreement terminated and release room in one transaction |
-| `void ExpireAgreement(int agreementId)` | Set agreement expired and release room in one transaction |
-| `void CancelAgreement(int agreementId)` | Set agreement cancelled and release room if safe |
-| `int ExpireDueAgreements(DateTime today)` | Batch expire active agreements past end date |
-| `int RenewAgreement(int sourceAgreementId, RentalAgreement renewal)` | Create renewal and lifecycle old/new agreements transactionally |
+### 8.6 Locking and isolation
 
-Lookup and report helpers:
+For transitions, lock the agreement and room rows using an appropriate SQL Server strategy such as `UPDLOCK, HOLDLOCK` inside a short transaction. The filtered unique index remains the final concurrency guard. Catch duplicate-key errors and return a domain message such as “The room was allocated by another user; refresh and try again.”
 
-| Method | Purpose |
-| --- | --- |
-| `DataTable GetActiveAgreements()` | Payment module agreement selection |
-| `DataTable GetExpiringAgreements(int daysAhead)` | Dashboard/report notification list |
-| `DataTable GetAgreementPaymentHistory(int agreementId)` | Read-only payment history |
-| `DataTable GetAgreementBalanceSummary(int agreementId)` | Due, paid, balance, overdue count |
+### 8.7 Payment integrity dependencies
 
-### 5.3 Query Standards
+The Payments module should later add:
 
-Use explicit columns:
+- unique billing-period constraint on `(AgreementId, PaymentYear, PaymentMonth)` if one row per month is the policy;
+- `PaidAmount <= DueAmount` and `BalanceAmount = DueAmount - PaidAmount`, or calculate balance instead of trusting input;
+- reversal metadata rather than deletion;
+- payment-period validation against contract dates.
 
-```sql
-SELECT
-    AgreementId,
-    AgreementNo,
-    TenantId,
-    RoomId,
-    StartDate,
-    EndDate,
-    MonthlyRent,
-    SecurityDeposit,
-    Status,
-    Notes,
-    CreatedByUserId,
-    CreatedAt
-FROM dbo.RentalAgreements
-WHERE AgreementId = @AgreementId;
+Agreements implementation must not assume those controls already exist.
+
+## 9. Model and contract plan
+
+### 9.1 Separate entities from read models
+
+Keep `RentalAgreement` as the persistence/write entity. Add purpose-specific models so the UI no longer relies on weakly typed `DataTable` columns for core workflows:
+
+```text
+Models/Agreements/
+├── AgreementListItem.cs
+├── AgreementDetails.cs
+├── AgreementBalanceSummary.cs
+├── AgreementPaymentItem.cs
+├── AgreementCreateRequest.cs
+├── AgreementUpdateDraftRequest.cs
+├── AgreementCloseRequest.cs
+└── AgreementRenewalRequest.cs
 ```
 
-Avoid `SELECT *` so future schema changes do not break grid behavior.
+The existing project style can continue using `ServiceResult<T>`, but new service methods should return typed models for compile-time safety. `DataTable` can remain at reporting boundaries.
 
-### 5.4 Mapping Standards
+### 9.2 Constants
 
-Follow existing repository style:
+Centralize status and action strings to prevent UI/BLL/SQL drift:
+
+```text
+Domain/AgreementStatuses.cs
+Domain/RoomStatuses.cs
+Domain/AgreementPermissions.cs
+```
+
+Because the project targets .NET Framework 4.7.2, simple static string constants are sufficient; avoid introducing a large framework only for this purpose.
+
+## 10. DAL plan
+
+### 10.1 Repository responsibilities
+
+`AgreementRepository` should:
+
+- execute typed, parameterized reads;
+- own connections, commands, readers, and transactions;
+- expose atomic workflow commands rather than low-level sequences the service can split;
+- translate affected-row and SQL constraint results into repository/domain exceptions;
+- never contain UI messaging or role decisions.
+
+### 10.2 Target interface
+
+Introduce an interface to make BLL tests possible:
 
 ```csharp
-private static RentalAgreement MapAgreement(SqlDataReader reader)
+public interface IAgreementRepository
 {
-    return new RentalAgreement
-    {
-        AgreementId = Convert.ToInt32(reader["AgreementId"]),
-        AgreementNo = Convert.ToString(reader["AgreementNo"]),
-        TenantId = Convert.ToInt32(reader["TenantId"]),
-        RoomId = Convert.ToInt32(reader["RoomId"]),
-        StartDate = Convert.ToDateTime(reader["StartDate"]),
-        EndDate = Convert.ToDateTime(reader["EndDate"]),
-        MonthlyRent = Convert.ToDecimal(reader["MonthlyRent"]),
-        SecurityDeposit = Convert.ToDecimal(reader["SecurityDeposit"]),
-        Status = Convert.ToString(reader["Status"]),
-        Notes = Convert.ToString(reader["Notes"]),
-        CreatedByUserId = Convert.ToInt32(reader["CreatedByUserId"]),
-        CreatedAt = Convert.ToDateTime(reader["CreatedAt"])
-    };
+    IReadOnlyList<AgreementListItem> Search(AgreementSearchCriteria criteria);
+    AgreementDetails GetDetails(int agreementId);
+    RentalAgreement GetById(int agreementId);
+    int CreateDraft(AgreementCreateRequest request, int userId);
+    void UpdateDraft(AgreementUpdateDraftRequest request, int userId, byte[] rowVersion);
+    void Activate(int agreementId, int userId, byte[] rowVersion);
+    void Close(AgreementCloseRequest request, int userId, byte[] rowVersion);
+    int CreateRenewalDraft(AgreementRenewalRequest request, int userId);
+    void HandoverRenewal(int sourceId, int successorId, int userId);
+    int ExpireDue(DateTime businessDate, int userId);
 }
 ```
 
-### 5.5 Transaction Requirement
+### 10.3 Immediate DAL corrections
 
-Agreement activation and ending must be atomic:
+- Replace `AddWithValue` with explicit `SqlDbType`, size, precision, and scale.
+- Combine draft insert and activation in one repository transaction/procedure.
+- Make `UpdateAgreementNotes` verify one affected row and use `RowVersion`.
+- Replace per-agreement expiry loops with a set-based, transactional operation.
+- Remove duplicated directory aggregation SQL where the view provides the same contract.
+- Use `CommandType.StoredProcedure` for lifecycle procedures.
+- Set a documented command timeout.
+- Do not expose connection strings or SQL text in user-facing errors.
 
-```text
-Begin transaction
-  Validate current agreement row and current room row
-  Update RentalAgreements.Status
-  Update Rooms.Status
-Commit transaction
-Rollback on failure
-```
+## 11. BLL plan
 
-Recommended transaction examples:
+### 11.1 Service responsibilities
 
-```sql
-UPDATE dbo.RentalAgreements
-SET Status = 'Active'
-WHERE AgreementId = @AgreementId
-AND Status = 'Draft';
+`AgreementService` remains the application façade and must own:
 
-UPDATE dbo.Rooms
-SET Status = 'Occupied'
-WHERE RoomId = @RoomId
-AND Status = 'Available';
-```
+- input normalization and validation;
+- permission checks;
+- business-date and lifecycle policy;
+- orchestration of one atomic repository command per workflow;
+- domain-focused result messages;
+- durable audit/event requirements;
+- read-model delivery to the UI.
 
-The final implementation should check affected row counts after each update. If either update affects zero rows, roll back and return a friendly validation message because the agreement or room state changed during the workflow.
+### 11.2 Authorization matrix
 
-### 5.6 Agreement Number Generation
-
-Use a predictable agreement number:
-
-```text
-AGR-YYYYMM-0001
-```
-
-Repository method:
-
-```csharp
-string GetNextAgreementNo(DateTime startDate)
-```
-
-Suggested SQL:
-
-```sql
-SELECT COUNT(1) + 1
-FROM dbo.RentalAgreements
-WHERE AgreementNo LIKE @Prefix + '%';
-```
-
-Then format the sequence in C#:
-
-```text
-AGR-202607-0001
-```
-
-The unique constraint on `AgreementNo` remains the final protection. If a duplicate happens due to concurrency, regenerate once and retry.
-
-## 6. BLL Implementation Plan
-
-Update:
-
-```text
-BLL/AgreementService.cs
-```
-
-### 6.1 Service Responsibilities
-
-The service should:
-
-- Validate agreement input.
-- Normalize text fields.
-- Generate agreement numbers when missing.
-- Verify active tenant eligibility.
-- Verify room availability.
-- Enforce status transition rules.
-- Coordinate repository operations.
-- Return `ServiceResult` and `ServiceResult<T>` consistently.
-- Log important actions with `AuditRepository`.
-- Prevent raw SQL errors from leaking into final user-facing messages.
-- Keep the UI free of business decisions.
-
-### 6.2 Required Service Methods
-
-Agreement search and display:
-
-| Method | Purpose |
-| --- | --- |
-| `ServiceResult<DataTable> GetAgreementDirectory(...)` | Load main agreement grid |
-| `ServiceResult<RentalAgreement> GetAgreementById(int agreementId)` | Load selected agreement |
-| `ServiceResult<DataTable> GetAgreementDetails(int agreementId)` | Load details tab |
-| `ServiceResult<DataTable> GetAgreementPaymentHistory(int agreementId)` | Load payment history tab |
-| `ServiceResult<DataTable> GetAgreementBalanceSummary(int agreementId)` | Load financial summary |
-| `ServiceResult<DataTable> GetExpiringAgreements(int daysAhead)` | Dashboard/report support |
-
-Creation and update:
-
-| Method | Purpose |
-| --- | --- |
-| `ServiceResult CreateDraftAgreement(RentalAgreement agreement)` | Create draft without occupying room |
-| `ServiceResult CreateAndActivateAgreement(RentalAgreement agreement)` | Create active agreement and occupy room |
-| `ServiceResult UpdateDraftAgreement(RentalAgreement agreement)` | Edit fields while still draft |
-| `ServiceResult UpdateAgreementNotes(int agreementId, string notes)` | Update notes for non-draft agreement |
-
-Lifecycle:
-
-| Method | Purpose |
-| --- | --- |
-| `ServiceResult ActivateAgreement(int agreementId)` | Activate valid draft agreement |
-| `ServiceResult RenewAgreement(int agreementId, DateTime newEndDate, decimal monthlyRent, decimal securityDeposit, string notes)` | Create next agreement period |
-| `ServiceResult TerminateAgreement(int agreementId, string reason)` | End active agreement manually |
-| `ServiceResult ExpireAgreement(int agreementId)` | Mark selected active agreement expired |
-| `ServiceResult ExpireDueAgreements()` | Batch expiry job from UI/admin refresh |
-| `ServiceResult CancelAgreement(int agreementId, string reason)` | Cancel draft or eligible future agreement |
-
-Lookup methods for UI:
-
-| Method | Purpose |
-| --- | --- |
-| `ServiceResult<List<Tenant>> GetEligibleTenants()` | Wrap or call `TenantService.GetActiveTenants()` |
-| `ServiceResult<List<Room>> GetEligibleRooms()` | Wrap or call `PropertyService.GetAvailableRooms()` |
-
-### 6.3 Validation Rules
-
-| Field | Rule |
-| --- | --- |
-| AgreementNo | Optional on create, required after generation, maximum 50 characters |
-| TenantId | Required and must point to active tenant |
-| RoomId | Required and must point to available room for active create/activation |
-| StartDate | Required and must be before end date |
-| EndDate | Required and must be after start date |
-| MonthlyRent | Required and greater than zero |
-| SecurityDeposit | Required and zero or greater |
-| Status | Must be `Draft`, `Active`, `Expired`, `Terminated`, or `Cancelled` |
-| Notes | Optional, maximum 500 characters |
-| CreatedByUserId | Required from `CurrentSession.User.UserId` |
-
-### 6.4 Status Transition Rules
-
-| From | To | Rule |
+| Capability | Admin | Staff |
 | --- | --- | --- |
-| Draft | Active | Tenant active, room available, no active room conflict |
-| Draft | Cancelled | Allowed |
-| Draft | Draft | Editable |
-| Active | Expired | Allowed when end date passed or Admin manually confirms |
-| Active | Terminated | Allowed with confirmation/reason |
-| Active | Cancelled | Block unless future-dated and no payments exist |
-| Expired | Active | Block; use renewal |
-| Terminated | Active | Block; use renewal |
-| Cancelled | Active | Block; create a new agreement |
-
-### 6.5 Editable Field Rules
-
-| Agreement Status | Editable Fields |
-| --- | --- |
-| Draft | Tenant, room, start date, end date, rent, deposit, notes |
-| Active | Notes only in normal workflow |
-| Expired | Notes only, Admin recommended |
-| Terminated | Notes only, Admin recommended |
-| Cancelled | Notes only, Admin recommended |
-
-Changing tenant, room, dates, or rent after activation can damage payment and audit history. If corrections are required, create a dedicated Admin correction workflow later.
-
-### 6.6 Room Status Rules
-
-| Agreement Action | Room Status Requirement | Room Status Result |
-| --- | --- | --- |
-| Create draft | Room should be available, but not locked | No change |
-| Activate | Room must be `Available` | `Occupied` |
-| Create active | Room must be `Available` | `Occupied` |
-| Terminate | Agreement must be `Active` | `Available` if no active agreement remains |
-| Expire | Agreement must be `Active` | `Available` if no active agreement remains |
-| Cancel draft | No strict room requirement | No change |
-| Cancel future active | No payments, agreement future-dated | `Available` if no active agreement remains |
-
-### 6.7 Tenant Eligibility Rules
-
-| Tenant Status | Can Create Draft | Can Activate |
-| --- | --- | --- |
-| Active | Yes | Yes |
-| Inactive | No | No |
-| Blacklisted | No | No |
-
-If a tenant becomes inactive after draft creation, activation must be blocked until the tenant is active again.
-
-### 6.8 Audit Logging
-
-Use `AuditRepository.Add` for:
-
-- `Create Draft Agreement`
-- `Create Active Agreement`
-- `Update Draft Agreement`
-- `Activate Agreement`
-- `Renew Agreement`
-- `Terminate Agreement`
-- `Expire Agreement`
-- `Cancel Agreement`
-- `Update Agreement Notes`
-
-Recommended descriptions:
-
-```text
-Created draft agreement 'AGR-202607-0001' for TenantId 5 and RoomId 8.
-Activated agreement 'AGR-202607-0001' and marked RoomId 8 as Occupied.
-Terminated agreement 'AGR-202607-0001'. Reason: tenant moved out.
-```
-
-Audit logging should follow the existing `TryAudit` style and must not block the main agreement workflow if logging fails.
-
-## 7. UI Implementation Plan
-
-### 7.1 Recommended UI Type
-
-Use a dashboard-loaded `UserControl`, matching the existing Properties and Tenants modules.
-
-Create:
-
-```text
-Forms/Agreements/AgreementManagementControl.cs
-Forms/Agreements/AgreementManagementControl.Designer.cs
-```
-
-Update:
-
-```text
-Forms/Dashboard/FrmDashboard.cs
-Housing rental.csproj
-```
-
-Dashboard integration:
-
-```csharp
-private void BtnAgreements_Click(object sender, EventArgs e)
-{
-    SetActiveButton(sender as Button);
-    NavigateToControl("Rental Agreements", new AgreementManagementControl());
-}
-```
-
-### 7.2 Main Screen Layout
-
-```text
-+----------------------------------------------------------------------------+
-| Search [________________] Status [All v] Property [All v] Date From/To      |
-+----------------------------------------------------------------------------+
-| Tabs: Agreements | Editor | Details | Payments | Expiring                   |
-+----------------------------------------------------------------------------+
-| Agreement grid / history grid                         | Editor/detail panel |
-| DataGridView                                          | Fields and actions  |
-+----------------------------------------------------------------------------+
-| Status message                                                              |
-+----------------------------------------------------------------------------+
-```
-
-### 7.3 Tabs
-
-| Tab | Purpose |
-| --- | --- |
-| Agreements | Search, filter, select agreements, run lifecycle actions |
-| Editor | Create draft, create active, edit draft, update notes |
-| Details | Read-only tenant, room, property, dates, rent, deposit, payment summary |
-| Payments | Read-only payment records for selected agreement |
-| Expiring | Agreements ending soon, useful before renewal |
-
-### 7.4 Agreement Editor Fields
-
-| Control | Field |
-| --- | --- |
-| TextBox readonly | Agreement number |
-| ComboBox | Tenant |
-| ComboBox | Available room |
-| DateTimePicker | Start date |
-| DateTimePicker | End date |
-| NumericUpDown or validated TextBox | Monthly rent |
-| NumericUpDown or validated TextBox | Security deposit |
-| ComboBox readonly/controlled | Status |
-| TextBox multiline | Notes |
-
-Primary actions:
-
-- New Agreement
-- Save Draft
-- Save and Activate
-- Update Draft
-- Activate
-- Renew
-- Terminate
-- Cancel
-- Refresh
-
-### 7.5 Main Agreement Grid Columns
-
-Use `vw_AgreementDirectory` if added, otherwise use an equivalent repository query.
-
-| Column | Source |
-| --- | --- |
-| Agreement | `AgreementNo` |
-| Tenant | `TenantName` |
-| Phone | `TenantPhone` |
-| Property | `PropertyName` |
-| House | `HouseName` |
-| Room | `RoomNo` |
-| Start | `StartDate` |
-| End | `EndDate` |
-| Rent | `MonthlyRent` |
-| Deposit | `SecurityDeposit` |
-| Status | `AgreementStatus` |
-| Balance | `TotalBalance` |
-
-### 7.6 Details Tab
-
-The details tab should be read-only and show:
-
-- Agreement number, status, start date, end date.
-- Tenant name, phone, tenant status.
-- Property, house, room, room type, room status.
-- Monthly rent and security deposit.
-- Total due, total paid, total balance, payment count.
-- Created by user and created date.
-- Notes.
-
-### 7.7 Payments Tab
-
-Show payment history for the selected agreement:
-
-| Column | Source |
-| --- | --- |
-| Receipt | `ReceiptNo` |
-| Month | `PaymentMonth` |
-| Year | `PaymentYear` |
-| Due | `DueAmount` |
-| Paid | `PaidAmount` |
-| Balance | `BalanceAmount` |
-| Payment Date | `PaymentDate` |
-| Method | `PaymentMethod` |
-| Status | `Status` |
-
-The Agreements module should not collect payments directly. It should only display payment history and provide context for the future Payments module.
-
-### 7.8 Expiring Tab
-
-Show agreements ending in the next configurable period, default 30 days:
-
-| Column | Source |
-| --- | --- |
-| Agreement | `AgreementNo` |
-| Tenant | `TenantName` |
-| Phone | `TenantPhone` |
-| Room | `RoomNo` |
-| End Date | `EndDate` |
-| Days Left | calculated |
-| Rent | `MonthlyRent` |
-
-Actions:
-
-- Renew selected agreement.
-- Open agreement details.
-- Refresh expiring list.
-
-### 7.9 UI Behavior
-
-| Behavior | Requirement |
-| --- | --- |
-| Grid selection | Loads selected agreement into editor and details tabs |
-| New button | Clears editor, loads eligible tenants and rooms |
-| Save Draft | Creates `Draft` agreement without room status update |
-| Save and Activate | Creates `Active` agreement and marks room `Occupied` |
-| Activate | Validates tenant/room again before status change |
-| Renew | Creates a new agreement period and keeps history |
-| Terminate | Requires confirmation and reason |
-| Cancel | Requires confirmation and is limited by status rules |
-| Search/filter | Refreshes current agreement grid without reloading the whole form |
-| Empty state | Shows friendly status when no agreements exist |
-| Validation | Shows clear message and does not save invalid data |
-
-### 7.10 Visual Style
-
-Match the current dashboard, property, tenant, and user management screens:
-
-- Font: Segoe UI.
-- Neutral light background.
-- White work surfaces.
-- Blue primary action buttons.
-- Green success messages.
-- Red blocked-action messages.
-- Amber warning treatment for expiring agreements.
-- Red treatment for terminated or cancelled agreements.
-- `DataGridView` with readable headers and stable column widths.
-- `BindingSource` for all grids.
-- `SplitContainer` or tabbed layout to keep the screen organized.
-
-## 8. Integration Plan
-
-### 8.1 Dashboard Integration
-
-The dashboard already reads:
-
-```sql
-(SELECT COUNT(*) FROM dbo.RentalAgreements WHERE Status = 'Active') AS ActiveAgreements
-```
-
-After agreement implementation:
-
-- Creating or activating an agreement should increase active agreement count.
-- Terminating or expiring an agreement should decrease active agreement count.
-- Activating an agreement should increase occupied room count and decrease available room count.
-- Terminating or expiring an agreement should release room availability when safe.
-- Monthly expected rent should equal active agreement rent total.
-
-### 8.2 Property and Room Integration
-
-Use:
-
-```csharp
-PropertyService.GetAvailableRooms()
-```
-
-Agreement activation must:
-
-- Confirm the selected room still exists.
-- Confirm the selected room is still `Available`.
-- Update room status to `Occupied` inside the same transaction as agreement activation.
-
-Agreement termination/expiry must:
-
-- Update agreement status.
-- Check whether another active agreement exists for the room.
-- Set room status to `Available` only when no active agreement remains.
-
-### 8.3 Tenant Integration
-
-Use:
-
-```csharp
-TenantService.GetActiveTenants()
-```
-
-Agreement activation must:
-
-- Confirm the selected tenant still exists.
-- Confirm tenant status is still `Active`.
-- Block inactive or blacklisted tenants.
-
-Tenant details already show agreement history, so the Agreements module should keep that data reliable by never deleting agreements.
-
-### 8.4 Rent Payment Integration
-
-The future Payments module should depend on active agreements:
-
-```text
-Active Agreement -> Monthly Due -> Rent Payment -> Receipt
-```
-
-Agreement module should provide:
-
-- `GetActiveAgreements()` for payment agreement selection.
-- Agreement rent amount for default due amount.
-- Agreement status checks before creating payment records.
-
-Payment module should prevent collection against:
-
-- Draft agreements.
-- Cancelled agreements.
-- Terminated agreements after termination date unless collecting old balance is explicitly allowed.
-
-### 8.5 Reports Integration
-
-Agreement-related reports:
-
-| Report | Data Source |
-| --- | --- |
-| Active Agreement Report | `vw_ActiveAgreements` |
-| Agreement Directory Report | `vw_AgreementDirectory` or repository query |
-| Expiring Agreement Report | `GetExpiringAgreements` query |
-| Tenant Agreement History | `TenantRepository.GetTenantAgreementHistory` |
-| Agreement Payment History | Agreement payment history query |
-
-### 8.6 Audit Integration
-
-All lifecycle changes must include:
-
-- Logged-in user ID from `CurrentSession.User.UserId`.
-- Agreement ID as record ID.
-- Clear action name.
-- Short readable description.
-
-## 9. Security and Authorization Plan
-
-### 9.1 Recommended Permissions
-
-| Action | Admin | Staff |
-| --- | --- | --- |
-| View agreements | Yes | Yes |
-| Create draft agreement | Yes | Yes |
-| Activate agreement | Yes | Yes |
-| Edit draft agreement | Yes | Yes |
+| View/search/details/payments | Yes | Yes |
+| Create/edit draft | Yes | Yes |
+| Activate | Yes | Yes, if operational policy allows |
 | Update notes | Yes | Yes |
-| Renew agreement | Yes | Yes |
-| Terminate agreement | Yes | Limited or Yes with confirmation |
-| Cancel agreement | Yes | Limited |
-| Expire due agreements | Yes | Yes |
-| Correct active agreement fields | Admin only, future enhancement |
+| Cancel draft | Yes | Yes |
+| Cancel future Active | Yes | No |
+| Terminate Active | Yes | No or supervisor approval |
+| Force expiry / bulk expiry | Yes | Scheduled system action only for Staff |
+| Create renewal draft | Yes | Yes |
+| Correct activated contract terms | Explicit admin workflow only | No |
 
-### 9.2 Data Protection
+Enforce permissions inside the service, not only by hiding buttons.
 
-- Do not expose raw SQL exception details in final UI messages.
-- Do not log sensitive tenant identity data in full.
-- Use confirmation dialogs before termination, cancellation, or expiry.
-- Keep agreement numbers stable after creation.
-- Keep payment history read-only from agreement screens.
+### 11.3 Error policy
 
-## 10. Error Handling Plan
+Return safe messages for expected failures:
 
-### 10.1 UI Layer
+- not found;
+- invalid transition;
+- tenant/room no longer eligible;
+- duplicate agreement number;
+- concurrency conflict;
+- unauthorized action;
+- dependent payments prevent cancellation.
 
-The UI should handle:
+Log the technical exception separately with a correlation identifier. Current patterns append `ex.Message` directly; replace this before release.
 
-- Missing tenant selection.
-- Missing room selection.
-- Invalid date range.
-- Invalid money values.
-- No selected agreement for lifecycle actions.
-- Confirmation before risky actions.
-- Empty grids and unavailable lookup data.
+### 11.4 Session handling
 
-### 10.2 BLL Layer
+Remove the fallback that attributes writes to user ID `1`. A lifecycle-changing operation must fail if `CurrentSession.User` is missing. This prevents incorrect audit ownership and foreign-key surprises.
 
-The service should handle:
+## 12. UI/UX plan
 
-- Duplicate agreement number.
-- Inactive or blacklisted tenant.
-- Room not available.
-- Existing active agreement for the room.
-- Optional existing active agreement for the tenant.
-- Invalid status transition.
-- Attempts to edit locked fields after activation.
-- Friendly database exception wrapping.
+### 12.1 Retain the current screen concept
 
-### 10.3 DAL Layer
+The current dashboard-loaded `AgreementManagementControl` matches the rest of the project. Retain:
 
-The repository should handle:
+- searchable/filterable agreement grid;
+- editor panel;
+- details and payments tabs;
+- expiring-agreements view;
+- New, Save Draft, Save & Activate, Activate, Renew, Terminate, Cancel, and Expire actions.
 
-- Parameterized SQL only.
-- Connection disposal with `using`.
-- Transaction rollback on lifecycle failure.
-- Explicit column lists.
-- `DBNull` handling through `SqlHelper.Parameter`.
-- Duplicate key failures as recoverable workflow errors.
+### 12.2 Refactor for maintainability
 
-## 11. Implementation Phases
+The code-behind and Designer files are large. Split behavior without changing navigation:
 
-### Phase 1: Repository Foundation
+```text
+Forms/Agreements/
+├── AgreementManagementControl.cs
+├── AgreementManagementControl.Designer.cs
+├── AgreementEditorControl.cs
+├── AgreementDetailsControl.cs
+├── AgreementPaymentHistoryControl.cs
+└── AgreementUiMapper.cs
+```
+
+If that is too large for the current delivery, first extract mapping, lookup binding, and grid-formatting helpers.
+
+### 12.3 Required user experience behavior
+
+- Disable actions based on status and permission, while still enforcing in BLL.
+- Show a visible status badge and renewal/source link.
+- Require a reason dialog for termination and eligible cancellation.
+- Show a confirmation summary before activation: tenant, room path, date range, rent, deposit.
+- On concurrency conflict, preserve user input where safe, reload server data, and explain what changed.
+- Debounce search/filter changes rather than querying on every keystroke.
+- Use async loading only if introduced consistently; never access WinForms controls off the UI thread.
+- Format money using the configured currency and dates using one application culture.
+- Provide empty, loading, success, validation, and failure states.
+- Do not display raw exception or SQL Server text.
+
+### 12.4 Accessibility and consistency
+
+- Preserve keyboard tab order and visible focus.
+- Add access keys for primary commands.
+- Do not communicate status by color alone.
+- Use consistent confirmation wording and button order.
+- Ensure grids have explicit columns, friendly headers, and stable sorting.
+
+## 13. Cross-module integration contracts
+
+### 13.1 Properties, Houses, and Rooms
+
+- Agreement activation is the authoritative operation that changes Available → Occupied.
+- Agreement closure changes Occupied → Available only if no other effective agreement remains.
+- Property/House deactivation and room Maintenance/Inactive transitions remain blocked while an effective active agreement exists.
+- Add a reconciliation query/report that flags disagreement between room status and active agreement state.
+
+### 13.2 Tenants
+
+- Only Active tenants appear in activation lookup.
+- Tenant deactivation/blacklisting remains blocked while an effective active agreement exists.
+- Agreement history must include closed and renewed contracts.
+- Tenant balance reads must not omit tenants with zero payments; use left joins where required.
+
+### 13.3 Rent Collection
+
+Expose a typed, read-only agreement selection contract containing Agreement ID/no, tenant, room path, contract dates, monthly rent, and status. Payments must independently recheck that the billing period belongs to the agreement.
+
+Closing an agreement does not delete or rewrite payments. Outstanding balances remain visible after closure.
+
+### 13.4 Dashboard
+
+Define metrics precisely:
+
+- `ActiveAgreements`: agreements effective on the business date;
+- `MonthlyExpectedRent`: contract rent for agreements effective in the selected month, with a documented proration policy;
+- `OccupiedRooms`: operational occupancy reconciled with effective agreements;
+- `ExpiringSoon`: active agreements ending within the configured window;
+- `OverduePayments`: payment responsibility, not inferred only from agreement status.
+
+### 13.5 Reports
+
+Minimum agreement reports:
+
+- agreement register by status/date/property;
+- active occupancy register;
+- expiry forecast (30/60/90 days);
+- agreement payment ledger;
+- termination/cancellation audit report;
+- renewal chain report;
+- room/agreement reconciliation exception report.
+
+### 13.6 Audit
+
+Record create draft, update draft, activation, note update, cancellation, expiry, termination, renewal draft, handover, and rejected privileged attempts where appropriate. Audit failure for a legally meaningful transition should be reconsidered: lifecycle metadata must be in the main transaction even if the general audit log remains best-effort.
+
+## 14. Security and operational quality
+
+### 14.1 Security requirements
+
+- Integrated SQL authentication remains acceptable for local deployment, using least-privilege database rights.
+- No hard-coded fallback user for writes.
+- Parameterized commands only.
+- National ID and other tenant-sensitive data should not appear in broad agreement grids or audit descriptions.
+- Connection and technical error details are logged locally with controlled access.
+- Admin-only actions are checked in BLL.
+
+### 14.2 Observability
+
+Add a small application logging abstraction supporting:
+
+- timestamp, severity, module, operation, user ID, agreement ID, and correlation ID;
+- exception details for diagnostics;
+- lifecycle duration and failure reason;
+- a rolling local file or Windows Event Log appropriate to desktop deployment.
+
+Do not log passwords, connection strings, national IDs, or full sensitive payloads.
+
+### 14.3 Performance targets
+
+For a local SQL Express deployment with up to 100,000 agreements:
+
+- initial filtered directory load: under 2 seconds;
+- search after debounce: under 1 second for indexed filters;
+- lifecycle command: under 2 seconds excluding user confirmation;
+- directory queries use paging instead of loading all history;
+- query plans show index seeks for status/date and tenant/room lookups where selective.
+
+## 15. Implementation phases
+
+### Phase 0 — Baseline and decisions (mandatory)
 
 Tasks:
 
-- Create `DAL/AgreementRepository.cs`.
-- Add agreement search, lookup, create, and draft update methods.
-- Add agreement directory and details queries.
-- Add duplicate agreement number check.
-- Add active room and optional active tenant checks.
-- Add payment history and balance summary queries.
+- Restore/fix local SQL Server connectivity and compare deployed schema with scripts.
+- Back up the target database.
+- Capture table row counts, active-state conflicts, duplicate Agreement numbers, and room/status mismatches.
+- Decide single-active-agreement-per-tenant policy.
+- Decide renewal model and date inclusivity/proration rules.
+- Record current manual smoke-test results.
 
-Deliverable:
+Deliverables:
 
-- Agreement data can be safely read and written without UI involvement.
+- signed decision record;
+- schema-drift/data-quality report;
+- rollback-ready database backup.
 
-### Phase 2: Transactional Lifecycle Methods
+Exit gate: no unresolved business decision that changes constraints or lifecycle behavior.
 
-Tasks:
-
-- Add `ActivateAgreement`.
-- Add `TerminateAgreement`.
-- Add `ExpireAgreement`.
-- Add `CancelAgreement`.
-- Add `ExpireDueAgreements`.
-- Add `RenewAgreement`.
-- Ensure each lifecycle method uses `SqlTransaction` where room status changes are involved.
-
-Deliverable:
-
-- Agreement status and room status remain consistent even when a database error occurs.
-
-### Phase 3: Service Layer
+### Phase 1 — Test seam and safety net (mandatory)
 
 Tasks:
 
-- Expand `BLL/AgreementService.cs`.
-- Add repository and audit dependencies.
-- Add full validation and normalization.
-- Add agreement number generation.
-- Add create draft and create active workflows.
-- Add status transition protection.
-- Add lifecycle methods returning `ServiceResult`.
-- Add non-blocking audit logging.
+- Add `IAgreementRepository` and constructor injection to `AgreementService` while keeping a default constructor for WinForms composition.
+- Add a test project compatible with .NET Framework 4.7.2.
+- Characterize current validation and lifecycle behavior.
+- Create reusable SQL integration-test setup/cleanup scripts.
 
-Deliverable:
+Exit gate: tests reproduce critical current behavior and the project still builds.
 
-- UI can call agreement workflows and receive friendly success or validation messages.
-
-### Phase 4: Agreement UI Control
+### Phase 2 — Database migrations and concurrency (mandatory)
 
 Tasks:
 
-- Create `Forms/Agreements/AgreementManagementControl.cs`.
-- Create designer layout with filters, tabs, grids, and editor.
-- Add `BindingSource` objects for agreement list, details, payments, and expiring agreements.
-- Load active tenants and available rooms into ComboBoxes.
-- Add save, activate, renew, terminate, cancel, refresh, and search handlers.
-- Add clear empty-state and validation status messages.
+- Add lifecycle metadata, renewal self-link, `UpdatedAt`, and `RowVersion`.
+- Add the security-deposit constraint.
+- Add the agreement number sequence.
+- Add the tenant filtered unique index if approved.
+- Update views/procedures and deploy through versioned migrations.
+- Validate indexes and existing data.
 
-Deliverable:
+Exit gate: migration succeeds on a database copy, is rerunnable safely where promised, and validation queries pass.
 
-- Users can manage rental agreements from a professional dashboard module.
-
-### Phase 5: Dashboard Navigation
+### Phase 3 — Atomic lifecycle workflows (mandatory)
 
 Tasks:
 
-- Add `using Housing_rental.Forms.Agreements;`.
-- Replace the Agreements placeholder in `FrmDashboard.BtnAgreements_Click`.
-- Add new form files to `Housing rental.csproj`.
+- Implement atomic Create Draft and Create-and-Activate.
+- Implement locked Activate and Close procedures/repository calls.
+- Replace looped expiry with a set-based command.
+- Implement renewal draft and atomic handover.
+- Map duplicate key, stale row version, and invalid transition errors to domain results.
+- Remove fallback user ID.
 
-Deliverable:
+Exit gate: fault-injection tests prove no orphan Draft/Occupied split state and no double allocation.
 
-- Clicking the sidebar Agreements button opens the real Agreements module.
-
-### Phase 6: Database Hardening
-
-Tasks:
-
-- Add recommended agreement indexes.
-- Decide whether to add one-active-agreement-per-tenant unique index.
-- Add optional `vw_AgreementDirectory`.
-- Add optional expiry and expiring-agreement stored procedures.
-- Re-run scripts on a clean database.
-
-Deliverable:
-
-- Database supports reliable search, reporting, lifecycle safety, and demo data integrity.
-
-### Phase 7: Integration Testing and Polish
+### Phase 4 — Service authorization and error hardening (mandatory)
 
 Tasks:
 
-- Test create draft, create active, activate, renew, terminate, cancel, and expire workflows.
-- Verify room status updates after lifecycle changes.
-- Verify dashboard counts after agreement changes.
-- Verify tenant details agreement history updates.
-- Verify available-room ComboBox excludes occupied rooms.
-- Improve grid formatting, currency columns, and date columns.
-- Finalize messages and confirmations.
+- Add permission checks for every command.
+- Centralize status/action constants.
+- Require termination/cancellation reasons.
+- Stop returning raw exception messages.
+- Add structured diagnostic logging and correlation IDs.
 
-Deliverable:
+Exit gate: direct BLL calls cannot bypass authorization; sensitive technical details do not reach UI.
 
-- Agreements module is stable, consistent, and ready for demonstration.
+### Phase 5 — Typed reads and UI refinement (recommended)
 
-## 12. Suggested Development Order
+Tasks:
 
-1. Implement `AgreementRepository` read/search methods.
-2. Implement `AgreementRepository` create/update draft methods.
-3. Implement transactional lifecycle methods.
-4. Expand `AgreementService` validation and workflow methods.
-5. Build agreement list and editor UI.
-6. Add details, payments, and expiring tabs.
-7. Replace dashboard placeholder.
-8. Add database indexes and optional directory view.
-9. Add audit logging.
-10. Run manual integration tests.
-11. Polish UI messages and grid formatting.
+- Add Agreement search/detail/payment DTOs.
+- Migrate operational UI binding from `DataTable` to typed lists.
+- Add paging and debounced search.
+- Add lifecycle confirmation summaries, status badges, concurrency handling, and renewal-chain navigation.
+- Extract helpers/subcontrols from the oversized code-behind.
 
-This order keeps the module testable from the database outward and protects the most important business rule: agreement status and room status must stay synchronized.
+Exit gate: core workflows are usable by keyboard, state-appropriate actions are clear, and large datasets remain responsive.
 
-## 13. Manual Test Plan
+### Phase 6 — Cross-module integration (mandatory before module completion)
 
-### 13.1 Creation Tests
+Tasks:
 
-| Test | Expected Result |
+- Update Tenant and Property guards to use effective agreement logic.
+- Update Dashboard metrics.
+- Publish the typed Agreement contract for Payments.
+- Implement agreement reports or stable report queries.
+- Add room/agreement reconciliation.
+
+Exit gate: a lifecycle transition is reflected consistently in Agreements, Rooms, Tenants, Dashboard, payment selection, and reports.
+
+### Phase 7 — Release verification (mandatory)
+
+Tasks:
+
+- Run automated unit, integration, concurrency, migration, and smoke tests.
+- Test upgrade against a production-like database copy.
+- Review permissions and audit output.
+- Run Release build and installer/deployment smoke test.
+- Prepare operational runbook and rollback instructions.
+
+Exit gate: all P0/P1 defects closed, acceptance criteria signed, backup/rollback tested.
+
+## 16. Test strategy
+
+### 16.1 Unit tests
+
+Cover:
+
+- validation boundaries and normalization;
+- status transition matrix;
+- authorization matrix;
+- termination reason requirement;
+- renewal date calculation;
+- safe exception-to-result mapping;
+- missing session rejection.
+
+### 16.2 SQL/DAL integration tests
+
+Cover:
+
+- FK and check constraints;
+- one active agreement per room;
+- optional one active agreement per tenant;
+- Agreement number sequence uniqueness;
+- row-version stale update rejection;
+- atomic activation/closure/renewal;
+- room release behavior;
+- historical joins after related records are inactive;
+- migration from the current schema with representative data.
+
+### 16.3 Concurrency tests
+
+Run two connections simultaneously for:
+
+- activating two drafts for one room;
+- activating two agreements for one tenant if restricted;
+- generating agreement numbers;
+- closing and renewing the same agreement;
+- editing the same Draft from two UI sessions.
+
+Expected result: exactly one valid winner, a friendly conflict for the loser, and no inconsistent room state.
+
+### 16.4 End-to-end/manual scenarios
+
+| Scenario | Expected result |
 | --- | --- |
-| Create draft with active tenant and available room | Draft agreement is saved and room remains Available |
-| Create active agreement with active tenant and available room | Agreement becomes Active and room becomes Occupied |
-| Create agreement without tenant | Validation message appears |
-| Create agreement without room | Validation message appears |
-| Create agreement with end date before start date | Validation message appears |
-| Create agreement with zero rent | Validation message appears |
-| Create agreement with negative deposit | Validation message appears |
-| Create duplicate agreement number | System blocks duplicate or regenerates number |
+| Create valid Draft | Saved, room remains Available, audit/lifecycle metadata correct |
+| Edit Draft | Terms update and row version changes |
+| Activate valid Draft | Agreement Active and room Occupied in one commit |
+| Activate after another user takes room | Friendly conflict; no partial state |
+| Activate inactive/blacklisted tenant | Blocked |
+| Cancel Draft | Cancelled; no room change |
+| Cancel future unpaid Active | Allowed only per role/policy; room reconciled |
+| Cancel started or paid Active | Blocked; termination offered |
+| Terminate Active with reason | Terminated, reason/actor/time stored, room released |
+| Expire due agreements | Only overdue Active agreements expire; dashboard refreshes |
+| Create renewal | Successor Draft linked; source stays Active |
+| Handover renewal | Source Expired and successor Active atomically |
+| View closed agreement payments | History remains available |
+| Deactivate occupied room/property/tenant | Blocked by related-module guard |
+| Missing SQL Server | Friendly operational message; diagnostic log contains details |
 
-### 13.2 Eligibility Tests
+### 16.5 Non-functional tests
 
-| Test | Expected Result |
-| --- | --- |
-| Select inactive tenant for activation | System blocks activation |
-| Select blacklisted tenant for activation | System blocks activation |
-| Select occupied room for activation | System blocks activation |
-| Activate draft after room was occupied by another agreement | System blocks activation |
-| Activate draft after tenant was deactivated | System blocks activation |
+- Query performance at 10k and 100k agreements.
+- UI responsiveness during directory reload.
+- Keyboard navigation and high-DPI layout.
+- Upgrade/rollback rehearsal.
+- Failure during transaction before and after each write.
 
-### 13.3 Lifecycle Tests
-
-| Test | Expected Result |
-| --- | --- |
-| Activate valid draft | Agreement becomes Active and room becomes Occupied |
-| Terminate active agreement | Agreement becomes Terminated and room becomes Available |
-| Expire active agreement past end date | Agreement becomes Expired and room becomes Available |
-| Cancel draft agreement | Agreement becomes Cancelled and room remains Available |
-| Renew active agreement | New agreement period is created and history remains available |
-| Try to edit active agreement room | System blocks locked field update |
-| Try to reactivate terminated agreement | System blocks action |
-
-### 13.4 Integration Tests
-
-| Test | Expected Result |
-| --- | --- |
-| Create active agreement | Dashboard active agreements increases |
-| Create active agreement | Dashboard occupied rooms increases and available rooms decreases |
-| Terminate agreement | Dashboard active agreements decreases |
-| Terminate agreement | Room appears in available-room lookup again |
-| Open tenant details | Agreement appears in tenant agreement history |
-| Open property occupancy tab | Tenant and agreement appear beside occupied room |
-| Open payment module lookup later | Active agreement appears for payment collection |
-
-### 13.5 Edge Cases
-
-| Test | Expected Result |
-| --- | --- |
-| SQL Server unavailable | Friendly database connection message appears |
-| Two users activate agreements for same room | Database unique index prevents duplicate active room agreement |
-| Agreement has payment records and user tries cancellation | System blocks or requires Admin correction workflow |
-| Active agreement end date is today | System does not expire until agreed rule is met |
-| Agreement end date is in the past | Expiry workflow marks it Expired and releases room |
-
-## 14. Acceptance Criteria
+## 17. Acceptance criteria
 
 The Agreements module is complete when:
 
-- The dashboard Agreements button opens `AgreementManagementControl`.
-- Agreements can be searched and filtered by text, status, property, tenant, and dates.
-- Draft agreements can be created and edited.
-- Active agreements can be created from active tenants and available rooms.
-- Activating an agreement marks the room as `Occupied`.
-- Terminating or expiring an agreement releases the room when safe.
-- Cancelled, terminated, and expired agreements remain visible for history.
-- Active tenant and available room rules are enforced in `AgreementService`.
-- Agreement lifecycle changes are transactional in `AgreementRepository`.
-- The UI does not directly execute SQL.
-- All SQL uses parameters.
-- Audit logs are created for major agreement actions.
-- Dashboard counts remain consistent after agreement lifecycle changes.
-- Tenant and property screens show agreement effects through their existing history and occupancy views.
-- The project builds in Visual Studio.
+- the current project builds in Debug and Release;
+- all schema changes deploy through non-destructive migrations;
+- agreement numbers are concurrency-safe;
+- create-and-activate is one transaction;
+- room occupancy and agreement state cannot diverge through supported workflows;
+- renewal does not expire a current contract early;
+- all lifecycle actions enforce both state and role at the BLL boundary;
+- manual termination/cancellation stores actor, time, and reason;
+- stale edits are rejected through optimistic concurrency;
+- one-active-room and the approved tenant-cardinality rule are database-enforced;
+- no normal workflow physically deletes an agreement or payment history;
+- raw database exceptions are not shown to users;
+- Dashboard, Tenant, Property/Room, Payments selection, and Reports use consistent agreement semantics;
+- automated tests cover critical rules and concurrent allocation;
+- migration, rollback, reconciliation, and operational runbooks exist.
 
-## 15. Quality Checklist
+## 18. Definition of done checklist
 
-Before marking the module complete:
+### Code
 
-- `AgreementRepository.cs` follows the style of `PropertyRepository.cs` and `TenantRepository.cs`.
-- `AgreementService.cs` returns `ServiceResult` and `ServiceResult<T>` consistently.
-- Lifecycle methods use transactions for agreement and room updates.
-- Agreement status values match the database check constraint exactly.
-- Room status values match the database check constraint exactly.
-- Active agreements never point to inactive tenants or unavailable rooms.
-- Agreement number generation is predictable and uniqueness-protected.
-- No physical delete exists in normal agreement workflows.
-- ComboBoxes load only eligible tenants and rooms.
-- Active agreement fields are not casually editable.
-- Payment history is read-only in the Agreements module.
-- Grid columns are clear and formatted for dates/currency.
-- Audit logging does not block agreement operations if it fails.
-- New files are included in `Housing rental.csproj`.
-- The project builds without errors.
+- [ ] UI calls BLL only; BLL calls repository abstractions.
+- [ ] No `AddWithValue` in modified Agreement data access.
+- [ ] One transaction owns each multi-table lifecycle command.
+- [ ] Public commands validate session, permission, input, and row version.
+- [ ] Status/action strings are centralized.
+- [ ] New files are included in `Housing rental.csproj`.
+- [ ] Debug and Release builds pass without warnings introduced by the work.
 
-## 16. Risks and Mitigation
+### Database
 
-| Risk | Mitigation |
+- [ ] Forward migration reviewed and tested against a populated copy.
+- [ ] Data-quality prechecks pass.
+- [ ] Constraints and filtered indexes match approved policy.
+- [ ] Views/procedures return expected historical and effective records.
+- [ ] Reconciliation query returns zero unexpected mismatches.
+
+### Quality
+
+- [ ] Unit, integration, concurrency, and smoke tests pass.
+- [ ] Authorization tests call services directly.
+- [ ] User messages are actionable and non-technical.
+- [ ] Audit/lifecycle metadata identifies actor and time.
+- [ ] Performance targets are met with representative data.
+- [ ] Documentation and operational runbook are updated.
+
+## 19. Risks and mitigations
+
+| Risk | Impact | Mitigation |
+| --- | --- | --- |
+| Deployed database differs from scripts | Migration failure/data loss | Phase 0 drift audit and backup |
+| Concurrent room allocation | Double booking | Locked transaction + filtered unique index |
+| Split create/activate | Orphan Draft after failure | One atomic repository command |
+| `MAX + 1` numbering race | Duplicate save failures | SQL sequence + unique constraint |
+| Renewal closes source early | Wrong occupancy/dashboard/reporting | Successor Draft + handover workflow |
+| UI-only permission control | Unauthorized direct service calls | BLL authorization |
+| Best-effort audit loses legal history | Weak traceability | Lifecycle metadata in main transaction |
+| `DataTable` column drift | Runtime binding failures | Typed operational DTOs |
+| Destructive setup scripts used as upgrades | Data loss | Versioned migrations and runbook |
+| Raw SQL errors shown to users | Security/usability issue | Error mapping + diagnostic logging |
+| Large history loads freeze UI | Poor usability | Paging, indexes, debounce, measured queries |
+
+## 20. Recommended delivery priority
+
+| Priority | Work |
 | --- | --- |
-| Room status and agreement status become inconsistent | Use transactions for lifecycle workflows |
-| Two users assign the same room | Keep `UX_RentalAgreements_OneActiveRoom` and validate before activation |
-| Inactive tenant receives active agreement | Re-check tenant status in service before create/activate |
-| Payments are created for inactive agreements | Payment module must select only active agreements |
-| Active agreement edits damage history | Lock core fields after activation |
-| Dashboard counts are wrong | Update room status consistently and test dashboard after each lifecycle action |
-| New agreements disappear from joined reports | Use left joins for payment summaries |
-| Cancellation loses business history | Use `Cancelled` status, never delete |
+| P0 — correctness | Atomic create/activate, locking, number sequence, renewal semantics, lifecycle metadata, no fallback user |
+| P1 — release readiness | Authorization, migrations, error policy, row version, tests, integration consistency |
+| P2 — maintainability | Typed DTOs, UI extraction, paging, structured logging, report suite |
+| P3 — future | Documents, e-signature, notifications, configurable approval workflows |
 
-## 17. Future Enhancements
+## 21. Required decisions before coding
 
-After the core module is stable, consider:
+1. Can one tenant hold more than one simultaneously active agreement?
+2. Are agreement start/end dates inclusive, and is partial-month rent prorated?
+3. Is future scheduling represented by Draft or a new Scheduled status?
+4. Which roles may activate, terminate, cancel future Active agreements, and force expiry?
+5. Is agreement number editable, or always system-generated?
+6. Must lifecycle audit be legally durable, or is operational audit sufficient?
+7. What is the business timezone and configurable business date policy?
+8. Should renewal copy the deposit or record deposit carry-forward/refund separately?
 
-- Printable agreement document or RDLC agreement contract.
-- Agreement PDF export.
-- Tenant signature and document attachment support.
-- Agreement renewal reminders.
-- Automatic monthly rent due generation from active agreements.
-- Agreement amendment workflow.
-- Move-out inspection checklist.
-- Deposit refund tracking.
-- Admin correction log for rare contract data fixes.
+The recommended default for this project is: one active agreement per tenant, inclusive dates, no proration in the first release, successor renewal stored as Draft, system-generated Agreement number, Admin-only termination, and lifecycle metadata committed with the agreement transaction.
 
-## 18. Final Recommendation
+## 22. Final implementation recommendation
 
-Implement the Agreements module as a dashboard-loaded `AgreementManagementControl` backed by a dedicated `AgreementService` and `AgreementRepository`. The most important design rule is to treat agreement lifecycle changes as business transactions, not simple status edits.
+Keep the current WinForms + BLL + repository architecture and evolve the existing module rather than replacing it. Begin with decisions and a deployed-database audit, add a test seam, then harden the database and transactional workflows before refining UI or reports.
 
-The module should create a reliable bridge between tenants and rooms, keep room occupancy synchronized with active agreements, preserve all historical records, and provide clean data for payments, dashboard totals, reports, and final project demonstration.
+The most important architectural principle is that an Agreement lifecycle command is a single business transaction. Agreement state, room occupancy, renewal linkage, actor/time metadata, and critical invariants must succeed or fail together. Once that boundary is reliable, the Dashboard, Tenants, Properties, Payments, Audit, and Reports modules can consume Agreements data safely and consistently.

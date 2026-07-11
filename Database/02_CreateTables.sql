@@ -1,7 +1,19 @@
 USE HouseRentalDB;
 GO
 
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+IF OBJECT_ID('dbo.sp_Payment_Post', 'P') IS NOT NULL DROP PROCEDURE dbo.sp_Payment_Post;
+IF OBJECT_ID('dbo.PaymentReversals', 'U') IS NOT NULL DROP TABLE dbo.PaymentReversals;
+IF OBJECT_ID('dbo.PaymentAllocations', 'U') IS NOT NULL DROP TABLE dbo.PaymentAllocations;
+IF OBJECT_ID('dbo.Payments', 'U') IS NOT NULL DROP TABLE dbo.Payments;
+IF OBJECT_ID('dbo.RentCharges', 'U') IS NOT NULL DROP TABLE dbo.RentCharges;
+IF OBJECT_ID('dbo.LegacyRentPayments', 'U') IS NOT NULL DROP TABLE dbo.LegacyRentPayments;
 IF OBJECT_ID('dbo.RentPayments', 'U') IS NOT NULL DROP TABLE dbo.RentPayments;
+IF TYPE_ID('dbo.PaymentAllocationInput') IS NOT NULL DROP TYPE dbo.PaymentAllocationInput;
+IF OBJECT_ID('dbo.ReceiptNumberSequence', 'SO') IS NOT NULL DROP SEQUENCE dbo.ReceiptNumberSequence;
 IF OBJECT_ID('dbo.RentalAgreements', 'U') IS NOT NULL DROP TABLE dbo.RentalAgreements;
 IF OBJECT_ID('dbo.Expenses', 'U') IS NOT NULL DROP TABLE dbo.Expenses;
 IF OBJECT_ID('dbo.MaintenanceRequests', 'U') IS NOT NULL DROP TABLE dbo.MaintenanceRequests;
@@ -149,28 +161,124 @@ ON dbo.RentalAgreements(TenantId, Status);
 CREATE INDEX IX_RentalAgreements_RoomId_Status
 ON dbo.RentalAgreements(RoomId, Status);
 
-CREATE TABLE dbo.RentPayments
+CREATE TABLE dbo.RentCharges
 (
-    PaymentId INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_RentPayments PRIMARY KEY,
-    ReceiptNo NVARCHAR(50) NOT NULL CONSTRAINT UQ_RentPayments_ReceiptNo UNIQUE,
+    ChargeId BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_RentCharges PRIMARY KEY,
     AgreementId INT NOT NULL,
-    PaymentMonth INT NOT NULL,
-    PaymentYear INT NOT NULL,
-    DueAmount DECIMAL(18,2) NOT NULL,
-    PaidAmount DECIMAL(18,2) NOT NULL CONSTRAINT DF_RentPayments_PaidAmount DEFAULT (0),
-    BalanceAmount DECIMAL(18,2) NOT NULL,
-    PaymentDate DATE NOT NULL,
-    PaymentMethod NVARCHAR(50) NULL,
-    Status NVARCHAR(30) NOT NULL CONSTRAINT DF_RentPayments_Status DEFAULT ('Pending'),
-    CollectedByUserId INT NOT NULL,
-    Remarks NVARCHAR(300) NULL,
-    CreatedAt DATETIME NOT NULL CONSTRAINT DF_RentPayments_CreatedAt DEFAULT (GETDATE()),
-    CONSTRAINT FK_RentPayments_RentalAgreements FOREIGN KEY (AgreementId) REFERENCES dbo.RentalAgreements(AgreementId),
-    CONSTRAINT FK_RentPayments_Users FOREIGN KEY (CollectedByUserId) REFERENCES dbo.Users(UserId),
-    CONSTRAINT CK_RentPayments_Month CHECK (PaymentMonth BETWEEN 1 AND 12),
-    CONSTRAINT CK_RentPayments_Amount CHECK (DueAmount > 0 AND PaidAmount >= 0 AND BalanceAmount >= 0),
-    CONSTRAINT CK_RentPayments_Status CHECK (Status IN ('Pending', 'Partial', 'Paid', 'Overdue', 'Cancelled'))
+    ChargeType NVARCHAR(30) NOT NULL CONSTRAINT DF_RentCharges_ChargeType DEFAULT ('MonthlyRent'),
+    BillingPeriod DATE NOT NULL,
+    PeriodStart DATE NOT NULL,
+    PeriodEnd DATE NOT NULL,
+    DueDate DATE NOT NULL,
+    Amount DECIMAL(18,2) NOT NULL,
+    CurrencyCode CHAR(3) NOT NULL,
+    Description NVARCHAR(250) NULL,
+    SourceType NVARCHAR(30) NOT NULL CONSTRAINT DF_RentCharges_SourceType DEFAULT ('AgreementRent'),
+    GenerationRunId UNIQUEIDENTIFIER NULL,
+    Status NVARCHAR(20) NOT NULL CONSTRAINT DF_RentCharges_Status DEFAULT ('Open'),
+    CreatedByUserId INT NOT NULL,
+    CreatedAt DATETIME2(0) NOT NULL CONSTRAINT DF_RentCharges_CreatedAt DEFAULT (SYSUTCDATETIME()),
+    RowVersion ROWVERSION NOT NULL,
+    CONSTRAINT FK_RentCharges_Agreements FOREIGN KEY (AgreementId) REFERENCES dbo.RentalAgreements(AgreementId),
+    CONSTRAINT FK_RentCharges_Users FOREIGN KEY (CreatedByUserId) REFERENCES dbo.Users(UserId),
+    CONSTRAINT CK_RentCharges_Amount CHECK (Amount > 0),
+    CONSTRAINT CK_RentCharges_Period CHECK (PeriodEnd >= PeriodStart),
+    CONSTRAINT CK_RentCharges_BillingPeriod CHECK (DAY(BillingPeriod) = 1),
+    CONSTRAINT CK_RentCharges_Currency CHECK (CurrencyCode LIKE '[A-Z][A-Z][A-Z]'),
+    CONSTRAINT CK_RentCharges_Status CHECK (Status IN ('Open', 'Waived')),
+    CONSTRAINT CK_RentCharges_ChargeType CHECK (ChargeType IN ('MonthlyRent', 'Adjustment', 'LateFee'))
 );
+
+CREATE UNIQUE INDEX UX_RentCharges_MonthlyAgreementPeriod
+ON dbo.RentCharges(AgreementId, ChargeType, BillingPeriod)
+WHERE ChargeType = 'MonthlyRent';
+
+CREATE INDEX IX_RentCharges_AgreementPeriod
+ON dbo.RentCharges(AgreementId, BillingPeriod)
+INCLUDE (DueDate, Amount, CurrencyCode, Status);
+
+CREATE INDEX IX_RentCharges_DueDateStatus
+ON dbo.RentCharges(DueDate, Status)
+INCLUDE (AgreementId, BillingPeriod, Amount, CurrencyCode);
+
+CREATE TABLE dbo.Payments
+(
+    PaymentId BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Payments PRIMARY KEY,
+    ReceiptNo NVARCHAR(50) NOT NULL CONSTRAINT UQ_Payments_ReceiptNo UNIQUE,
+    RequestId UNIQUEIDENTIFIER NOT NULL CONSTRAINT UQ_Payments_RequestId UNIQUE,
+    TenantId INT NOT NULL,
+    AgreementId INT NOT NULL,
+    PaymentDate DATE NOT NULL,
+    Amount DECIMAL(18,2) NOT NULL,
+    CurrencyCode CHAR(3) NOT NULL,
+    PaymentMethod NVARCHAR(30) NOT NULL,
+    ExternalReference NVARCHAR(100) NULL,
+    Status NVARCHAR(20) NOT NULL CONSTRAINT DF_Payments_Status DEFAULT ('Posted'),
+    Remarks NVARCHAR(300) NULL,
+    CollectedByUserId INT NOT NULL,
+    PostedAt DATETIME2(0) NOT NULL CONSTRAINT DF_Payments_PostedAt DEFAULT (SYSUTCDATETIME()),
+    RowVersion ROWVERSION NOT NULL,
+    CONSTRAINT FK_Payments_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(TenantId),
+    CONSTRAINT FK_Payments_Agreements FOREIGN KEY (AgreementId) REFERENCES dbo.RentalAgreements(AgreementId),
+    CONSTRAINT FK_Payments_Users FOREIGN KEY (CollectedByUserId) REFERENCES dbo.Users(UserId),
+    CONSTRAINT CK_Payments_Amount CHECK (Amount > 0),
+    CONSTRAINT CK_Payments_Currency CHECK (CurrencyCode LIKE '[A-Z][A-Z][A-Z]'),
+    CONSTRAINT CK_Payments_Status CHECK (Status IN ('Posted', 'Reversed')),
+    CONSTRAINT CK_Payments_Method CHECK (PaymentMethod IN ('Cash', 'BankTransfer', 'Card', 'MobileBanking', 'Cheque'))
+);
+
+CREATE INDEX IX_Payments_AgreementDate
+ON dbo.Payments(AgreementId, PaymentDate DESC)
+INCLUDE (ReceiptNo, Amount, CurrencyCode, Status, PaymentMethod);
+
+CREATE INDEX IX_Payments_TenantDate
+ON dbo.Payments(TenantId, PaymentDate DESC)
+INCLUDE (AgreementId, ReceiptNo, Amount, CurrencyCode, Status);
+
+CREATE INDEX IX_Payments_StatusDate
+ON dbo.Payments(Status, PaymentDate)
+INCLUDE (Amount, CurrencyCode, CollectedByUserId);
+
+CREATE TABLE dbo.PaymentAllocations
+(
+    AllocationId BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PaymentAllocations PRIMARY KEY,
+    PaymentId BIGINT NOT NULL,
+    ChargeId BIGINT NOT NULL,
+    Amount DECIMAL(18,2) NOT NULL,
+    CreatedAt DATETIME2(0) NOT NULL CONSTRAINT DF_PaymentAllocations_CreatedAt DEFAULT (SYSUTCDATETIME()),
+    CONSTRAINT FK_PaymentAllocations_Payments FOREIGN KEY (PaymentId) REFERENCES dbo.Payments(PaymentId),
+    CONSTRAINT FK_PaymentAllocations_Charges FOREIGN KEY (ChargeId) REFERENCES dbo.RentCharges(ChargeId),
+    CONSTRAINT UQ_PaymentAllocations_PaymentCharge UNIQUE (PaymentId, ChargeId),
+    CONSTRAINT CK_PaymentAllocations_Amount CHECK (Amount > 0)
+);
+
+CREATE INDEX IX_PaymentAllocations_Charge
+ON dbo.PaymentAllocations(ChargeId)
+INCLUDE (PaymentId, Amount);
+
+CREATE TABLE dbo.PaymentReversals
+(
+    ReversalId BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PaymentReversals PRIMARY KEY,
+    PaymentId BIGINT NOT NULL CONSTRAINT UQ_PaymentReversals_Payment UNIQUE,
+    RequestId UNIQUEIDENTIFIER NOT NULL CONSTRAINT UQ_PaymentReversals_Request UNIQUE,
+    Reason NVARCHAR(500) NOT NULL,
+    ReversedByUserId INT NOT NULL,
+    ReversedAt DATETIME2(0) NOT NULL CONSTRAINT DF_PaymentReversals_ReversedAt DEFAULT (SYSUTCDATETIME()),
+    CONSTRAINT FK_PaymentReversals_Payments FOREIGN KEY (PaymentId) REFERENCES dbo.Payments(PaymentId),
+    CONSTRAINT FK_PaymentReversals_Users FOREIGN KEY (ReversedByUserId) REFERENCES dbo.Users(UserId),
+    CONSTRAINT CK_PaymentReversals_Reason CHECK (LEN(LTRIM(RTRIM(Reason))) > 0)
+);
+
+CREATE SEQUENCE dbo.ReceiptNumberSequence
+AS BIGINT START WITH 1 INCREMENT BY 1 CACHE 20;
+GO
+
+CREATE TYPE dbo.PaymentAllocationInput AS TABLE
+(
+    ChargeId BIGINT NOT NULL PRIMARY KEY,
+    Amount DECIMAL(18,2) NOT NULL
+);
+GO
 
 CREATE TABLE dbo.MaintenanceRequests
 (

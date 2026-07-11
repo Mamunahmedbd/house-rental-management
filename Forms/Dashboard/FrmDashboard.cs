@@ -5,6 +5,7 @@ using Housing_rental.BLL;
 using Housing_rental.Forms.Admin;
 using Housing_rental.Forms.Agreements;
 using Housing_rental.Forms.Common;
+using Housing_rental.Forms.Payments;
 using Housing_rental.Forms.Properties;
 using Housing_rental.Forms.Tenants;
 using Housing_rental.Models;
@@ -83,7 +84,7 @@ namespace Housing_rental.Forms.Dashboard
         private void BtnPayments_Click(object sender, EventArgs e)
         {
             SetActiveButton(sender as Button);
-            ShowModule("Monthly Rent Collection", "This module will collect monthly rent, calculate balances, track payment status, and prepare receipt data.");
+            NavigateToControl("Monthly Rent Collection", new PaymentManagementControl());
         }
 
         private void BtnReports_Click(object sender, EventArgs e)
@@ -148,14 +149,15 @@ namespace Housing_rental.Forms.Dashboard
             }
 
             DashboardSummary summary = result.Data;
+            string currency = new RentPaymentService().GetDefaultCurrency();
             lblTotalProperties.Text = summary.TotalProperties + "\nTotal Properties";
             lblTotalRooms.Text = summary.TotalRooms + "\nTotal Rooms";
             lblAvailableRooms.Text = summary.AvailableRooms + "\nAvailable Rooms";
             lblOccupiedRooms.Text = summary.OccupiedRooms + "\nOccupied Rooms";
             lblTotalTenants.Text = summary.TotalTenants + "\nTotal Tenants";
             lblActiveAgreements.Text = summary.ActiveAgreements + "\nActive Agreements";
-            lblMonthlyCollected.Text = summary.MonthlyCollectedRent.ToString("C") + "\nMonthly Collected";
-            lblMonthlyDue.Text = summary.MonthlyDueRent.ToString("C") + "\nMonthly Due";
+            lblMonthlyCollected.Text = currency + " " + summary.MonthlyCollectedRent.ToString("N2") + "\nMonthly Collected";
+            lblMonthlyDue.Text = currency + " " + summary.MonthlyDueRent.ToString("N2") + "\nMonthly Due";
 
             lblStatus.Text = "Dashboard loaded successfully.";
             lblStatus.ForeColor = Color.ForestGreen;

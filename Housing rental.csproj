@@ -62,6 +62,7 @@
     <Compile Include="DAL\DashboardRepository.cs" />
     <Compile Include="DAL\DbConnectionFactory.cs" />
     <Compile Include="DAL\PropertyRepository.cs" />
+    <Compile Include="DAL\RentPaymentRepository.cs" />
     <Compile Include="DAL\RoleRepository.cs" />
     <Compile Include="DAL\SqlHelper.cs" />
     <Compile Include="DAL\TenantRepository.cs" />
@@ -93,6 +94,15 @@
     <Compile Include="Forms\Dashboard\FrmDashboard.Designer.cs">
       <DependentUpon>FrmDashboard.cs</DependentUpon>
     </Compile>
+    <Compile Include="Forms\Payments\PaymentManagementControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Forms\Payments\PaymentManagementControl.Designer.cs">
+      <DependentUpon>PaymentManagementControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\Payments\FrmPaymentReceipt.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Forms\Properties\PropertyManagementControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
@@ -110,6 +120,8 @@
     <Compile Include="Models\Expense.cs" />
     <Compile Include="Models\House.cs" />
     <Compile Include="Models\MaintenanceRequest.cs" />
+    <Compile Include="Models\PaymentConstants.cs" />
+    <Compile Include="Models\PaymentModels.cs" />
     <Compile Include="Models\Property.cs" />
     <Compile Include="Models\RentalAgreement.cs" />
     <Compile Include="Models\RentPayment.cs" />
@@ -147,8 +159,13 @@
     <None Include="Database\03_CreateViews.sql" />
     <None Include="Database\04_CreateStoredProcedures.sql" />
     <None Include="Database\05_SeedData.sql" />
+    <None Include="Database\Migrations\20260711_001_PaymentsLedger.sql" />
+    <None Include="Database\Migrations\20260711_002_PaymentProcedureSqlOptions.sql" />
+    <None Include="Database\Tests\PaymentsLedgerSmokeTest.sql" />
+    <None Include="Database\Tests\PaymentsReadModelSmokeTest.sql" />
     <None Include="docs\AGREEMENTS_MODULE_IMPLEMENTATION_PLAN.md" />
     <None Include="docs\HOUSE_RENTAL_MANAGEMENT_PROJECT_PLAN.md" />
+    <None Include="docs\PAYMENTS_MODULE_IMPLEMENTATION_PLAN.md" />
     <None Include="docs\PROPERTIES_MODULE_IMPLEMENTATION_PLAN.md" />
     <None Include="docs\PROJECT_PLANNING_AND_ARCHITECTURE.md" />
     <None Include="docs\TENANTS_MODULE_IMPLEMENTATION_PLAN.md" />
