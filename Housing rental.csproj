@@ -47,6 +47,20 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.ReportingServices.ReportViewerControl.WinForms">
+      <Version>150.1501.0</Version>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Models\ReportModels.cs" />
+    <Compile Include="BLL\ReportService.cs" />
+    <Compile Include="DAL\ReportRepository.cs" />
+    <Compile Include="Forms\Reports\ReportManagementControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Forms\Reports\ReportManagementControl.Designer.cs">
+      <DependentUpon>ReportManagementControl.cs</DependentUpon>
+    </Compile>
     <Compile Include="BLL\AgreementService.cs" />
     <Compile Include="BLL\AuthService.cs" />
     <Compile Include="BLL\CurrentSession.cs" />
@@ -163,13 +177,22 @@
     <None Include="Database\Migrations\20260711_002_PaymentProcedureSqlOptions.sql" />
     <None Include="Database\Tests\PaymentsLedgerSmokeTest.sql" />
     <None Include="Database\Tests\PaymentsReadModelSmokeTest.sql" />
+    <None Include="Database\Migrations\20260711_003_ReportProcedures.sql" />
+    <None Include="Database\Tests\ReportProceduresSmokeTest.sql" />
     <None Include="docs\AGREEMENTS_MODULE_IMPLEMENTATION_PLAN.md" />
     <None Include="docs\HOUSE_RENTAL_MANAGEMENT_PROJECT_PLAN.md" />
     <None Include="docs\PAYMENTS_MODULE_IMPLEMENTATION_PLAN.md" />
     <None Include="docs\PROPERTIES_MODULE_IMPLEMENTATION_PLAN.md" />
     <None Include="docs\PROJECT_PLANNING_AND_ARCHITECTURE.md" />
     <None Include="docs\TENANTS_MODULE_IMPLEMENTATION_PLAN.md" />
+    <None Include="docs\REPORTS_MODULE_IMPLEMENTATION_PLAN.md" />
     <None Include="README.md" />
+    <EmbeddedResource Include="Reports\TenantListReport.rdlc" />
+    <EmbeddedResource Include="Reports\PropertyOccupancyReport.rdlc" />
+    <EmbeddedResource Include="Reports\RentCollectionReport.rdlc" />
+    <EmbeddedResource Include="Reports\MonthlyDueReport.rdlc" />
+    <EmbeddedResource Include="Reports\AgreementReport.rdlc" />
+    <EmbeddedResource Include="Reports\IncomeSummaryReport.rdlc" />
     <Content Include="Assets\login_bg.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

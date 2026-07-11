@@ -8,6 +8,7 @@ using Housing_rental.Forms.Common;
 using Housing_rental.Forms.Payments;
 using Housing_rental.Forms.Properties;
 using Housing_rental.Forms.Tenants;
+using Housing_rental.Forms.Reports;
 using Housing_rental.Models;
 
 namespace Housing_rental.Forms.Dashboard
@@ -90,7 +91,7 @@ namespace Housing_rental.Forms.Dashboard
         private void BtnReports_Click(object sender, EventArgs e)
         {
             SetActiveButton(sender as Button);
-            ShowModule("Reports", "This module will show RDLC reports for tenants, occupancy, agreements, rent collection, monthly dues, and income summary.");
+            NavigateToControl("Reports", new ReportManagementControl());
         }
 
         private void BtnUsers_Click(object sender, EventArgs e)
